@@ -19,6 +19,16 @@ export const addDays = (date: string, days: number) =>
 export const datesFrom = (date: string, count: number) =>
   Array.from({ length: count }, (_, i) => addDays(date, i));
 export const snap = (minute: number) => Math.max(0, Math.min(1425, Math.round(minute / 15) * 15));
+export function placementAt(date: string, fraction?: number): Placement {
+  if (fraction === undefined) return { id: crypto.randomUUID(), kind: 'day', date };
+  const minute = snap(fraction * MINUTES_PER_DAY);
+  return {
+    id: crypto.randomUUID(),
+    kind: 'timed',
+    startAt: atMinute(date, minute),
+    endAt: atMinute(date, minute + 60),
+  };
+}
 export const clockLabel = (iso: string) => localInput(iso).slice(11);
 export const weekday = (date: string) =>
   new Intl.DateTimeFormat('zh-CN', { weekday: 'short', timeZone: 'Asia/Shanghai' }).format(

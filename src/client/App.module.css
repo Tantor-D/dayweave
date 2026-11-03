@@ -109,19 +109,16 @@
   font-family: var(--font);
   font-size: 13px;
   background:
-    radial-gradient(
-      ellipse at 12% 0%,
-      color-mix(in srgb, var(--accent-soft), transparent 30%),
-      transparent 56%
-    ),
-    radial-gradient(
-      ellipse at 100% 90%,
-      color-mix(in srgb, var(--accent), transparent 89%),
-      transparent 50%
-    ),
-    var(--bg);
-  padding: 0 22px 22px;
-  letter-spacing: 0.01em;
+    radial-gradient(ellipse at 2% 35%, var(--ambient-one), transparent 58%),
+    radial-gradient(ellipse at 85% 100%, var(--ambient-two), transparent 60%),
+    radial-gradient(ellipse at 85% 0%, var(--ambient-three), transparent 50%), var(--bg);
+  padding: 0 24px 24px;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+.app[data-theme='glass-dark'] {
+  color-scheme: dark;
 }
 .app h1,
 .app h2,
@@ -140,7 +137,7 @@
   margin: 20px 0 10px;
 }
 .header {
-  height: 90px;
+  height: 88px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -160,15 +157,15 @@
   gap: 12px;
 }
 .brand strong {
-  font-size: 25px;
-  letter-spacing: 0.14em;
-  font-weight: 650;
+  font-size: 23px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
 }
-.brand span:not(.version) {
-  font-size: 8px;
+.brand span {
+  font-size: 11px;
   color: var(--muted);
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.06em;
 }
 .brandMark {
   width: 32px;
@@ -189,14 +186,6 @@
   border-right: 2px solid var(--accent);
   border-radius: 1px 3px 1px 1px;
 }
-.version {
-  font-size: 9px;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 2px 4px;
-  align-self: center;
-}
 .topCenter {
   display: flex;
   align-items: center;
@@ -216,7 +205,13 @@
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
+  padding: 5px 6px;
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(var(--material-blur)) saturate(140%);
+  box-shadow: var(--shadow);
 }
 .headerActions button {
   border-color: transparent;
@@ -226,13 +221,15 @@
 }
 .headerActions .aiButton {
   background: var(--accent);
-  color: var(--bg);
+  color: var(--on-accent);
   padding: 10px 15px;
-  margin-left: 7px;
+  margin-left: 3px;
+  border-radius: 12px;
   border-color: var(--accent);
 }
 .headerActions .aiButton:hover {
-  color: var(--text);
+  background: color-mix(in srgb, var(--accent), var(--text) 12%);
+  color: var(--on-accent);
 }
 .layout {
   display: flex;
@@ -247,8 +244,8 @@
   flex-shrink: 0;
   border-radius: var(--radius);
   background: var(--surface);
-  backdrop-filter: blur(var(--material-blur));
-  border: 1px solid color-mix(in srgb, var(--line), transparent 15%);
+  backdrop-filter: blur(var(--material-blur)) saturate(130%);
+  border: 1px solid var(--glass-edge);
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
@@ -259,18 +256,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 27px 20px 20px;
+  padding: 30px 22px 24px;
   gap: 8px;
 }
-.eyebrow {
-  font-size: 8px;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
 .sidebarHeading h1 {
-  font-size: 22px;
+  font-size: 21px;
   margin: 0;
   display: flex;
   align-items: center;
@@ -292,11 +282,12 @@
   padding: 0;
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--bg);
+  color: var(--on-accent);
   flex-shrink: 0;
 }
 .roundAdd:hover {
-  color: var(--text);
+  color: var(--on-accent);
+  background: color-mix(in srgb, var(--accent), var(--text) 12%);
 }
 .search {
   margin: 0 18px 19px;
@@ -305,8 +296,8 @@
   gap: 9px;
   padding: 0 11px;
   border-radius: 9px;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--solid), transparent 40%);
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--line), transparent 58%);
   color: var(--muted);
 }
 .search input {
@@ -325,7 +316,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   padding-bottom: 11px;
 }
 .sidebarTabs > span {
@@ -333,7 +324,7 @@
   font-weight: 600;
 }
 .sidebarTabs button {
-  font-size: 10px;
+  font-size: 11px;
   padding: 3px 0;
   border: 0;
   color: var(--muted);
@@ -344,7 +335,7 @@
   padding: 3px 10px 20px;
 }
 .taskGroup h3 {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.01em;
   color: var(--muted);
   padding: 0 11px;
@@ -359,13 +350,13 @@
   font-weight: 400;
 }
 .taskRow {
-  padding: 11px 9px;
+  padding: 13px 10px;
   display: flex;
   align-items: flex-start;
   gap: 9px;
   margin-bottom: 4px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 13px;
   cursor: grab;
   touch-action: none;
 }
@@ -391,7 +382,7 @@
 }
 .taskText > span {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   word-break: break-word;
 }
@@ -399,7 +390,7 @@
   display: flex;
   gap: 5px;
   align-items: center;
-  font-size: 9px;
+  font-size: 10px;
   color: var(--muted);
   margin-top: 6px;
 }
@@ -537,21 +528,21 @@
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(var(--material-blur));
+  backdrop-filter: blur(var(--material-blur)) saturate(130%);
   overflow: hidden;
 }
 .boardToolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 25px 25px 16px;
+  padding: 28px 28px 20px;
   gap: 12px;
 }
 .dateTitle h2 {
-  font-size: 25px;
+  font-size: 28px;
   margin: 0;
   display: flex;
   align-items: baseline;
@@ -606,24 +597,26 @@
 }
 .segmented {
   display: flex;
-  background: color-mix(in srgb, var(--solid), transparent 15%);
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  background: color-mix(in srgb, var(--line), transparent 55%);
+  border: 1px solid transparent;
+  border-radius: 12px;
   padding: 3px;
   width: fit-content;
 }
 .segmented button {
-  padding: 5px 14px;
+  padding: 7px 16px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 9px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .segmented button.active {
-  background: var(--card);
-  color: var(--text);
-  box-shadow: 0 2px 4px #00000008;
+  background: var(--card) !important;
+  color: var(--text) !important;
+  box-shadow:
+    0 2px 6px #0000000d,
+    inset 0 1px 0 var(--glass-edge);
 }
 .viewActions {
   display: flex;
@@ -744,12 +737,16 @@
   flex-direction: column;
   gap: 5px;
   justify-content: center;
+  cursor: pointer;
 }
 .dropHint {
   color: var(--muted);
   font-size: 9px;
   text-align: center;
-  opacity: 0.65;
+  opacity: 0.85;
+}
+.dayDrop:hover {
+  background: var(--accent-soft);
 }
 .dayChip {
   border-radius: 5px;
@@ -799,20 +796,23 @@
     var(--line) 56px
   );
   touch-action: none;
+  cursor: crosshair;
 }
 .timeBlock {
   position: absolute;
   border: 1px solid color-mix(in srgb, var(--priority), transparent 66%);
   border-left: 3px solid var(--priority);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--priority), var(--solid) 89%);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--priority), var(--solid) 90%);
   color: var(--text);
   padding: 8px 8px 5px;
   overflow: hidden;
   cursor: grab;
   touch-action: none;
   z-index: 2;
-  box-shadow: 0 2px 4px #00000003;
+  box-shadow:
+    0 3px 8px #00000006,
+    inset 0 1px 0 var(--glass-edge);
   min-width: 16px;
 }
 .timeBlock:hover {
@@ -835,21 +835,21 @@
   line-height: 1.4;
 }
 .blockTitle strong {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 550;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .blockTime {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--muted);
   display: block;
   margin-top: 5px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.timeBlock > small {
+.timeBlock small {
   font-size: 8px;
   color: var(--priority);
   margin-top: 5px;
@@ -1056,8 +1056,8 @@
   width: 370px;
   flex-shrink: 0;
   background: var(--surface);
-  backdrop-filter: blur(var(--material-blur));
-  border: 1px solid var(--line);
+  backdrop-filter: blur(var(--material-blur)) saturate(130%);
+  border: 1px solid var(--glass-edge);
   border-radius: var(--radius);
   margin-left: 16px;
   display: flex;
@@ -1121,11 +1121,12 @@
 .primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--bg);
+  color: var(--on-accent);
   font-weight: 550;
 }
 .primary:hover {
-  color: var(--text);
+  color: var(--on-accent);
+  background: color-mix(in srgb, var(--accent), var(--text) 12%);
 }
 .hint {
   font-size: 11px;
@@ -1565,6 +1566,62 @@
 .modal .primary {
   padding: 12px;
 }
+.scheduleDialog {
+  width: 540px;
+  max-width: calc(100vw - 32px);
+  color: var(--text);
+  background: color-mix(in srgb, var(--solid), transparent 8%);
+  border-color: var(--glass-edge);
+  backdrop-filter: blur(var(--material-blur)) saturate(140%);
+  box-shadow:
+    0 32px 100px #00000030,
+    inset 0 1px 0 var(--glass-edge);
+}
+.scheduleDialog::backdrop {
+  background: #171a2b2b;
+  backdrop-filter: blur(5px);
+}
+.dialogCaption {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.taskChoices {
+  max-height: 190px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 5px;
+}
+.form .taskChoice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+}
+.taskChoice:has(input:checked) {
+  background: var(--accent-soft);
+}
+.taskChoice input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.taskChoice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.taskChoice small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 5px;
+}
 .toast {
   position: fixed;
   bottom: 30px;
@@ -1710,9 +1767,6 @@
   .brand strong {
     font-size: 21px;
   }
-  .version {
-    display: none;
-  }
   .layout {
     overflow-x: auto;
   }
@@ -1723,7 +1777,14 @@
     width: 10px;
   }
   .detail {
-    width: 320px;
+    position: absolute;
+    top: 74px;
+    right: 12px;
+    bottom: 12px;
+    width: min(360px, calc(100vw - 24px));
+    margin-left: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--solid), transparent 5%);
   }
   .board {
     min-width: 360px;
@@ -1734,14 +1795,8 @@
   .sidebarHeading h1 {
     font-size: 20px;
   }
-  .sidebarHeading .eyebrow {
-    font-size: 7px;
-  }
   .sidebarTabs {
     margin: 0 13px;
-  }
-  .boardToolbar .eyebrow {
-    font-size: 7px;
   }
   .modal {
     padding: 24px;
@@ -1750,8 +1805,23 @@
 @supports not (backdrop-filter: blur(10px)) {
   .sidebar,
   .board,
-  .detail {
+  .detail,
+  .headerActions,
+  .scheduleDialog {
     background: var(--solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar,
+  .board,
+  .detail,
+  .headerActions,
+  .scheduleDialog {
+    backdrop-filter: none;
+    background: var(--solid);
+  }
+  .scheduleDialog::backdrop {
+    backdrop-filter: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

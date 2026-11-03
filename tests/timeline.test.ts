@@ -7,11 +7,29 @@ import {
   dateOf,
   localInput,
   localToUTC,
+  placementAt,
   segmentsFor,
   snap,
   taskOnDay,
 } from '../src/client/time';
 const date = '2026-11-03';
+test('timeline clicks snap to 15 minutes, clamp edges and keep full duration across midnight', () => {
+  const day = placementAt(date);
+  assert.equal(day.kind, 'day');
+  if (day.kind === 'day') assert.equal(day.date, date);
+  for (const [fraction, minute] of [
+    [-0.01, 0],
+    [549 / 1440, 555],
+    [1, 1425],
+  ]) {
+    const result = placementAt(date, fraction);
+    assert.equal(result.kind, 'timed');
+    if (result.kind === 'timed') {
+      assert.equal(result.startAt, atMinute(date, minute));
+      assert.equal(Date.parse(result.endAt) - Date.parse(result.startAt), 3600000);
+    }
+  }
+});
 const task = (id: string, start: number, end: number): Task => ({
   id,
   title: id,

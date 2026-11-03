@@ -21,9 +21,18 @@ import {
   Sun,
   X,
 } from 'lucide-react';
-import type { Operation, Preferences, Proposal, Snapshot, Task, Workspace } from '../domain/types';
+import type {
+  Operation,
+  Placement,
+  Preferences,
+  Proposal,
+  Snapshot,
+  Task,
+  Workspace,
+} from '../domain/types';
 import { api, commit, readWorkspace } from './api';
 import { Timeline, useScheduleDrag } from './Timeline';
+import { ScheduleDialog } from './ScheduleDialog';
 import {
   AiPanel,
   BackgroundPanel,
@@ -81,6 +90,7 @@ export default function App() {
     [selected, setSelected] = useState<string>(),
     [search, setSearch] = useState(''),
     [newTask, setNewTask] = useState(false),
+    [schedule, setSchedule] = useState<{ placement: Placement; base: Snapshot<Workspace> }>(),
     [busy, setBusy] = useState(false),
     [connected, setConnected] = useState(true),
     [toast, setToast] = useState<{ message: string; error: boolean }>(),
@@ -139,7 +149,12 @@ export default function App() {
     };
   }, [refresh, notify]);
   const save = useCallback(
-    async (operations: Operation[], summary: string, base?: Snapshot<Workspace>) => {
+    async (
+      operations: Operation[],
+      summary: string,
+      base?: Snapshot<Workspace>,
+      reportError?: (message: string) => void,
+    ) => {
       const snap = base ?? snapshotRef.current;
       if (!snap) return false;
       setBusy(true);
@@ -149,6 +164,7 @@ export default function App() {
         notify('已保存');
         return true;
       } catch (e) {
+        reportError?.((e as Error).message);
         notify((e as Error).message, true);
         await refresh();
         return false;
@@ -339,9 +355,8 @@ export default function App() {
             </div>
             <div>
               <strong>留白</strong>
-              <span>FOCUS WORKBENCH</span>
+              <span>专注工作台</span>
             </div>
-            <span className={s.version}>v0.1</span>
           </div>
           <div className={s.topCenter}>
             <span className={s.liveDot} />
@@ -407,7 +422,6 @@ export default function App() {
                 <aside className={s.sidebar}>
                   <div className={s.sidebarHeading}>
                     <div>
-                      <div className={s.eyebrow}>A PLACE FOR EVERYTHING</div>
                       <h1>
                         我的任务 <span>{filteredTasks.length}</span>
                       </h1>
@@ -551,7 +565,6 @@ export default function App() {
                 <section className={s.board}>
                   <div className={s.boardToolbar}>
                     <div className={s.dateTitle}>
-                      <div className={s.eyebrow}>MAKE TIME FOR WHAT MATTERS</div>
                       <h2>
                         {Number(date.slice(5, 7))}月<span>{date.slice(0, 4)}</span>
                         <label className={s.datePicker} title="选择起始日期">
@@ -629,6 +642,9 @@ export default function App() {
                     onDrag={start}
                     preview={drag}
                     selectedId={selected}
+                    onSchedule={(placement) => {
+                      if (canClick() && snapshot) setSchedule({ placement, base: snapshot });
+                    }}
                   />
                 </section>
               }
@@ -701,6 +717,16 @@ export default function App() {
             }}
           />
         )}
+        {schedule && (
+          <ScheduleDialog
+            workspace={schedule.base.data}
+            placement={schedule.placement}
+            onClose={() => setSchedule(undefined)}
+            onSave={(operations, reportError) =>
+              save(operations, '从时间轴添加安排', schedule.base, reportError)
+            }
+          />
+        )}
         {toast && (
           <div role="status" className={`${s.toast} ${toast.error ? s.errorToast : ''}`}>
             {toast.error ? <Circle size={17} /> : <Check size={17} />}
@@ -765,7 +791,6 @@ function NewTaskDialog({
       <div role="dialog" aria-modal="true" aria-labelledby="new-task-title" className={s.modal}>
         <div className={s.modalHeader}>
           <div>
-            <div className={s.eyebrow}>ONE THING AT A TIME</div>
             <h2 id="new-task-title">新建任务</h2>
           </div>
           <button aria-label="关闭新建任务" onClick={onClose}>

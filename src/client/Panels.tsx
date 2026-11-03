@@ -82,7 +82,6 @@ export function TaskDetail({
   };
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>TASK DETAILS</div>
       <h2>为当下留一点空间</h2>
       <form onSubmit={submit} className={s.form}>
         <label>
@@ -390,7 +389,6 @@ export function FilterPanel({
     });
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>YOUR VIEW</div>
       <h2>只看此刻想看的</h2>
       <p className={s.hint}>筛选只改变显示。AI 的任务范围单独选择。</p>
       <button
@@ -466,7 +464,6 @@ export function OrganizationPanel({ workspace, save }: PanelProps) {
   };
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>MAKE ROOM</div>
       <h2>项目与分类</h2>
       <form className={s.form} onSubmit={(e) => void create(e)}>
         <div className={s.segmented}>
@@ -750,7 +747,6 @@ export function DocumentEditor({
 export function BackgroundPanel({ notify }: { notify: Notify }) {
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>A LITTLE CONTEXT</div>
       <h2>让 AI 了解你的节奏</h2>
       <p className={s.hint}>每次对话都会重新加载这两份背景。反思只在当次主动选择后读取。</p>
       <DocumentEditor target="long-term" title="长期背景" notify={notify} />
@@ -792,7 +788,6 @@ export function ReviewPanel({ notify, workspace }: { notify: Notify; workspace: 
   };
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>LOOK BACK, LIGHTLY</div>
       <h2>每天，留一点回望</h2>
       <input
         aria-label="复盘日期"
@@ -1000,7 +995,6 @@ export function HistoryPanel({
   };
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>EVERY CHANGE HAS A TRACE</div>
       <h2>修改历史</h2>
       <p className={s.hint}>
         恢复工作数据会影响整个任务、项目和排期快照；恢复文档只影响该文档。恢复会保留旧历史。
@@ -1130,7 +1124,6 @@ export function SettingsPanel({ notify, onSettings }: { notify: Notify; onSettin
   if (!settings) return <div className={s.panelContent}>正在读取设置…</div>;
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>ON YOUR TERMS</div>
       <h2>AI 与本机设置</h2>
       <form className={s.form} onSubmit={(e) => void submit(e)}>
         <label>
@@ -1261,7 +1254,6 @@ export function ProposalsPanel({
   };
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>YOU HAVE THE FINAL SAY</div>
       <h2>变更提案</h2>
       <p className={s.hint}>
         确认前查看真实修改。已有变化的目标需重新生成预览。创建、更新和完成时间以实际提交时刻为准；恢复保留原时间。
@@ -1403,7 +1395,6 @@ export function AiPanel({
   };
   return (
     <div className={s.panelContent}>
-      <div className={s.eyebrow}>THINK TOGETHER</div>
       <h2>一起理清下一步</h2>
       <p className={s.hint}>
         {settings?.baseUrl || '尚未配置模型接口'}

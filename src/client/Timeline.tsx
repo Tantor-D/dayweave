@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { Check, GripVertical } from 'lucide-react';
 import type { Operation, Placement, Task } from '../domain/types';
-import { atMinute, clockLabel, segmentsFor, snap, today, weekday } from './time';
+import { atMinute, clockLabel, placementAt, segmentsFor, snap, today, weekday } from './time';
 import s from './App.module.css';
 import { ThemeCard } from './themes';
 export type DragMode = 'move' | 'start' | 'end';
@@ -164,6 +164,7 @@ interface Props {
   dates: string[];
   orientation: 'vertical' | 'horizontal';
   onSelect: (id: string) => void;
+  onSchedule: (placement: Placement) => void;
   onDrag: DragStart;
   preview: DragState | null;
   selectedId?: string;
@@ -173,6 +174,7 @@ export function Timeline({
   dates,
   orientation,
   onSelect,
+  onSchedule,
   onDrag,
   preview,
   selectedId,
@@ -259,6 +261,7 @@ export function Timeline({
                     tasks={renderTasks}
                     onDrag={onDrag}
                     onSelect={onSelect}
+                    onSchedule={onSchedule}
                   />
                 ))}
               </div>
@@ -280,13 +283,20 @@ export function Timeline({
                     <b>
                       {date.slice(5)} {weekday(date)}
                     </b>
-                    <DayDrop date={date} tasks={renderTasks} onDrag={onDrag} onSelect={onSelect} />
+                    <DayDrop
+                      date={date}
+                      tasks={renderTasks}
+                      onDrag={onDrag}
+                      onSelect={onSelect}
+                      onSchedule={onSchedule}
+                    />
                   </div>
                   <div
                     className={s.timeCell}
                     data-time-date={date}
                     data-axis="horizontal"
                     style={{ height: daySizes[index] }}
+                    {...scheduleEvents(date)}
                   >
                     {all[index].map((seg) => renderSegment(seg, daySizes[index]))}
                     {date === today() && (
@@ -309,7 +319,13 @@ export function Timeline({
                 ))}
               </div>
               {dates.map((date, index) => (
-                <div key={date} className={s.timeCell} data-time-date={date} data-axis="vertical">
+                <div
+                  key={date}
+                  className={s.timeCell}
+                  data-time-date={date}
+                  data-axis="vertical"
+                  {...scheduleEvents(date)}
+                >
                   {all[index].map((seg) => renderSegment(seg, daySizes[index]))}
                   {date === today() && (
                     <div className={s.nowLine} style={{ top: `${(minutesNow / 1440) * 100}%` }} />
@@ -325,7 +341,7 @@ export function Timeline({
           <span className={s.liveDot} />
           本机保存 · Asia/Shanghai
         </span>
-        <span>拖动安排 · 边缘拉伸 · 15 分钟吸附</span>
+        <span>点击空白处安排 · 拖动调整 · 边缘拉伸</span>
       </div>
       {preview?.moved && (
         <div className={s.dragTip} style={{ left: preview.x + 16, top: preview.y + 16 }}>
@@ -339,6 +355,32 @@ export function Timeline({
       )}
     </div>
   );
+  function scheduleEvents(date: string) {
+    return {
+      tabIndex: 0,
+      role: 'group',
+      'aria-label': `${date} 时间轴，点击空白处或按回车安排任务`,
+      onClick: (event: React.MouseEvent<HTMLDivElement>) => {
+        if ((event.target as HTMLElement).closest('[data-placement]')) return;
+        event.currentTarget.focus({ preventScroll: true });
+        const rect = event.currentTarget.getBoundingClientRect();
+        onSchedule(
+          placementAt(
+            date,
+            horizontal
+              ? (event.clientX - rect.left) / rect.width
+              : (event.clientY - rect.top) / rect.height,
+          ),
+        );
+      },
+      onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onSchedule(placementAt(date, 9 / 24));
+        }
+      },
+    };
+  }
   function renderSegment(seg: ReturnType<typeof segmentsFor>[number], size: number) {
     const { task, placement } = seg;
     const css: CSSProperties = horizontal
@@ -357,6 +399,7 @@ export function Timeline({
     return (
       <div
         key={placement.id}
+        data-placement={placement.id}
         role="button"
         tabIndex={0}
         aria-label={`${task.title} ${clockLabel(placement.startAt)} 至 ${clockLabel(placement.endAt)}`}
@@ -403,20 +446,40 @@ function DayDrop({
   tasks,
   onDrag,
   onSelect,
+  onSchedule,
 }: {
   date: string;
   tasks: Task[];
   onDrag: DragStart;
   onSelect: (id: string) => void;
+  onSchedule: (placement: Placement) => void;
 }) {
   const placements = tasks.flatMap((task) =>
     task.placements.filter((p) => p.kind === 'day' && p.date === date).map((p) => ({ task, p })),
   );
   return (
-    <div className={s.dayDrop} data-day-date={date} aria-label={`${date} 未定时区域`}>
+    <div
+      className={s.dayDrop}
+      data-day-date={date}
+      aria-label={`${date} 未定时区域`}
+      role="group"
+      tabIndex={0}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest('[data-placement]')) return;
+        event.currentTarget.focus({ preventScroll: true });
+        onSchedule(placementAt(date));
+      }}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onSchedule(placementAt(date));
+        }
+      }}
+    >
       {placements.map(({ task, p }) => (
         <div
           key={p.id}
+          data-placement={p.id}
           role="button"
           tabIndex={0}
           className={`${s.dayChip} ${s[task.priority]} ${task.status === 'done' ? s.done : ''}`}
@@ -430,7 +493,7 @@ function DayDrop({
           {task.title}
         </div>
       ))}
-      {placements.length === 0 && <span className={s.dropHint}>拖到这里，仅安排日期</span>}
+      <span className={s.dropHint}>＋ 仅安排日期</span>
     </div>
   );
 }
