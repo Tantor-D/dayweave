@@ -1,3 +1,4 @@
+import { defaultStatistics } from '../domain/statistics.ts';
 import { legacyPreferencesSchema } from '../domain/legacy.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
@@ -46,6 +47,7 @@ interface ModelConfig {
   toolSupport: UserSettings['toolSupport'];
 }
 const defaults: Preferences = {
+  statistics: structuredClone(defaultStatistics),
   theme: 'glass-light',
   days: 3,
   orientation: 'vertical',
@@ -920,6 +922,7 @@ function parsePreferences(value: Record<string, unknown>): Preferences {
   )
     coded('INVALID_PREFERENCES', '状态筛选无效');
   const p = preferencesSchema.parse({
+    statistics: structuredClone(defaultStatistics),
     dayStart: 0,
     dayEnd: 1440,
     inheritParentTags: true,

@@ -1,3 +1,6 @@
+import { StatisticsDashboard } from './StatisticsDashboard';
+import statisticsStyles from './StatisticsDashboard.module.css';
+import { defaultStatistics } from '../domain/statistics.ts';
 import { TagPropagationDialog, type TagConfirmation } from './TagPropagationDialog';
 import { TaskFields, emptyTaskDraft, InheritTagsContext } from './TaskFields';
 import { ancestors, taskPath, treeOrder } from '../domain/tree';
@@ -6,6 +9,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CalendarDays,
+  ChartColumn,
   Check,
   ChevronDown,
   Circle,
@@ -58,6 +62,7 @@ import {
 import { themeStyle, ViewLayout, ThemeContext, ThemeCard } from './themes';
 import s from './App.module.css';
 const initialPreferences: Preferences = {
+  statistics: structuredClone(defaultStatistics),
   theme: 'glass-light',
   days: 3,
   orientation: 'vertical',
@@ -92,6 +97,7 @@ const panelTitles: Record<Panel, string> = {
   proposals: '变更提案',
 };
 export default function App() {
+  const [view, setView] = useState<'workbench' | 'statistics'>('workbench');
   const [snapshot, setSnapshot] = useState<Snapshot<Workspace>>(),
     [preferences, setPreferences] = useState(initialPreferences),
     [proposals, setProposals] = useState<Proposal[]>([]),
@@ -407,7 +413,9 @@ export default function App() {
     <ThemeContext.Provider value={preferences.theme}>
       <InheritTagsContext.Provider value={preferences.inheritParentTags}>
         <div className={s.app} style={themeStyle(preferences.theme)} data-theme={preferences.theme}>
-          <header className={s.header}>
+          <header
+            className={`${s.header} ${view === 'statistics' ? statisticsStyles.statisticsHeader : ''}`}
+          >
             <div className={s.brand}>
               <div className={s.brandMark}>
                 <span />
@@ -423,20 +431,52 @@ export default function App() {
             </div>
             <nav className={s.headerActions}>
               <button
+                aria-pressed={view === 'workbench'}
+                className={view === 'workbench' ? s.active : ''}
+                onClick={() => setView('workbench')}
+              >
+                <Columns3 size={16} />
+                工作台
+              </button>
+              <button
+                aria-pressed={view === 'statistics'}
+                className={view === 'statistics' ? s.active : ''}
+                onClick={() => setView('statistics')}
+              >
+                <ChartColumn size={16} />
+                统计
+              </button>
+              <button
                 className={panel === 'background' ? s.active : ''}
-                onClick={() => togglePanel('background')}
+                onClick={() => {
+                  setView('workbench');
+                  if (view === 'statistics') setPanel('background');
+                  else togglePanel('background');
+                }}
               >
                 <FileIcon />
                 背景
               </button>
               <button
                 className={panel === 'review' ? s.active : ''}
-                onClick={() => togglePanel('review')}
+                onClick={() => {
+                  setView('workbench');
+                  if (view === 'statistics') setPanel('review');
+                  else togglePanel('review');
+                }}
               >
                 <CalendarDays size={16} />
                 回望
               </button>
-              <button aria-label="修改历史" title="修改历史" onClick={() => togglePanel('history')}>
+              <button
+                aria-label="修改历史"
+                title="修改历史"
+                onClick={() => {
+                  setView('workbench');
+                  if (view === 'statistics') setPanel('history');
+                  else togglePanel('history');
+                }}
+              >
                 <History size={17} />
               </button>
               <button
@@ -450,10 +490,25 @@ export default function App() {
               >
                 {preferences.theme === 'glass-light' ? <Moon size={17} /> : <Sun size={17} />}
               </button>
-              <button aria-label="设置" title="设置" onClick={() => togglePanel('settings')}>
+              <button
+                aria-label="设置"
+                title="设置"
+                onClick={() => {
+                  setView('workbench');
+                  if (view === 'statistics') setPanel('settings');
+                  else togglePanel('settings');
+                }}
+              >
                 <Settings size={17} />
               </button>
-              <button className={s.aiButton} onClick={() => togglePanel('ai')}>
+              <button
+                className={s.aiButton}
+                onClick={() => {
+                  setView('workbench');
+                  if (view === 'statistics') setPanel('ai');
+                  else togglePanel('ai');
+                }}
+              >
                 <Sparkles size={15} />
                 AI 协作
               </button>
@@ -474,8 +529,15 @@ export default function App() {
               {snapshot?.external && (
                 <ExternalNotice snapshot={snapshot} reload={refresh} notify={notify} />
               )}
+              {view === 'statistics' && (
+                <StatisticsDashboard
+                  workspace={workspace}
+                  preferences={preferences.statistics}
+                  update={(statistics) => updatePreferences({ statistics })}
+                />
+              )}
               <ViewLayout
-                className={s.layout}
+                className={`${s.layout} ${view === 'statistics' ? statisticsStyles.hiddenWorkbench : ''}`}
                 panelWidth={preferences.panelWidth}
                 sidebar={
                   <aside className={s.sidebar}>

@@ -114,7 +114,15 @@ export interface Change {
   restoreOf?: string;
   completionEvents: { taskId: string; title: string; completedAt: string }[];
 }
+export interface StatisticsPreferences {
+  range: 'last30' | 'week' | 'month' | 'custom';
+  startDate: string | null;
+  endDate: string | null;
+  tagId: string | null;
+  hiddenCharts: ('duration' | 'first' | 'parallel' | 'tags' | 'selectedTag')[];
+}
 export interface Preferences {
+  statistics: StatisticsPreferences;
   theme: 'glass-light' | 'glass-dark';
   days: 1 | 3 | 7;
   orientation: 'vertical' | 'horizontal';

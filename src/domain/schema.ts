@@ -1,3 +1,4 @@
+import { validStatisticsDate } from './statistics.ts';
 import { z } from 'zod';
 import type { Target } from './types.ts';
 
@@ -109,7 +110,23 @@ export const previewSchema = z.strictObject({
   summary: z.string().max(2000).optional(),
   dependsOn: z.array(idSchema).max(20).optional(),
 });
+const statisticsDateSchema = z.string().refine(validStatisticsDate, '日期无效');
+export const statisticsPreferencesSchema = z
+  .strictObject({
+    range: z.enum(['last30', 'week', 'month', 'custom']),
+    startDate: statisticsDateSchema.nullable(),
+    endDate: statisticsDateSchema.nullable(),
+    tagId: idSchema.nullable(),
+    hiddenCharts: z.array(z.enum(['duration', 'first', 'parallel', 'tags', 'selectedTag'])),
+  })
+  .refine(
+    (p) =>
+      p.range !== 'custom' ||
+      (p.startDate !== null && p.endDate !== null && p.startDate <= p.endDate),
+    '请选择有效的起止日期',
+  );
 export const preferencesSchema = z.strictObject({
+  statistics: statisticsPreferencesSchema,
   theme: z.enum(['glass-light', 'glass-dark']),
   days: z.union([z.literal(1), z.literal(3), z.literal(7)]),
   orientation: z.enum(['vertical', 'horizontal']),
