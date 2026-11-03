@@ -8,6 +8,8 @@ export type Placement =
 export interface Tag {
   id: string;
   name: string;
+  color: string;
+  colorPriority: number;
   order: number;
   archivedAt: string | null;
 }
@@ -15,7 +17,7 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'in_progress' | 'done';
+  status: 'todo' | 'done';
   parentId: string | null;
   tagIds: string[];
   order: number;
@@ -26,15 +28,19 @@ export interface Task {
   placements: Placement[];
 }
 export interface Workspace {
-  schemaVersion: 2;
+  schemaVersion: 3;
   revision: number;
   timezone: 'Asia/Shanghai';
   tags: Tag[];
   tasks: Task[];
 }
 export type Operation =
-  | { type: 'tag.create'; id?: string; name: string }
-  | { type: 'tag.update'; id: string; patch: Partial<Pick<Tag, 'name' | 'order' | 'archivedAt'>> }
+  | { type: 'tag.create'; id?: string; name: string; color?: string; colorPriority?: number }
+  | {
+      type: 'tag.update';
+      id: string;
+      patch: Partial<Pick<Tag, 'name' | 'color' | 'colorPriority' | 'order' | 'archivedAt'>>;
+    }
   | {
       type: 'task.create';
       id?: string;
@@ -46,6 +52,7 @@ export type Operation =
   | {
       type: 'task.update';
       id: string;
+      propagateTags?: boolean;
       patch: Partial<
         Pick<
           Task,
@@ -115,6 +122,9 @@ export interface Preferences {
   hiddenTasks: string[];
   hiddenStatuses: Task['status'][];
   showArchived: boolean;
+  dayStart: number;
+  dayEnd: number;
+  inheritParentTags: boolean;
 }
 export interface UserSettings {
   approvalMode: ApprovalMode;

@@ -3,8 +3,8 @@
 ## 文档的关键结论
 
 - 本项目是本机运行、以可读文件保存数据的个人专注工作台；正式设计见下方两份方案，后续以用户确认的最新变更为准。
-- 功能范围与验收依据：[v0.1.0 focus-workbench 实施方案](docs/plans/v0.1.0_focus-workbench_functional-plan.md)。
-- 工程设计与验证依据：[v0.1.0 focus-workbench 技术路线](docs/plans/v0.1.0_focus-workbench_technical-plan.md)。
+- 功能范围与验收依据：[v0.3.0 task-workbench 功能计划](docs/plans/v0.3.0_task-workbench_functional-plan.md)。
+- 工程设计与验证依据：[v0.3.0 task-workbench 技术方案](docs/plans/v0.3.0_task-workbench_technical-plan.md)。
 
 ## 项目已有的文档查询约定
 

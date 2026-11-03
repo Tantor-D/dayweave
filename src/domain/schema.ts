@@ -24,6 +24,8 @@ export const tagNameSchema = z
 export const tagSchema = z.strictObject({
   id: idSchema,
   name: tagNameSchema,
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  colorPriority: z.number().int().min(0).max(9999),
   order: z.number().finite(),
   archivedAt,
 });
@@ -31,7 +33,7 @@ export const taskSchema = z.strictObject({
   id: idSchema,
   title,
   description: z.string().max(100000),
-  status: z.enum(['todo', 'in_progress', 'done']),
+  status: z.enum(['todo', 'done']),
   parentId: idSchema.nullable(),
   tagIds: z.array(idSchema),
   order: z.number().finite(),
@@ -42,18 +44,26 @@ export const taskSchema = z.strictObject({
   placements: z.array(placementSchema),
 });
 export const workspaceSchema = z.strictObject({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   revision: z.number().int().nonnegative(),
   timezone: z.literal('Asia/Shanghai'),
   tags: z.array(tagSchema),
   tasks: z.array(taskSchema),
 });
 export const operationSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('tag.create'), id: idSchema.optional(), name: tagNameSchema }),
+  z.strictObject({
+    type: z.literal('tag.create'),
+    id: idSchema.optional(),
+    name: tagNameSchema,
+    color: tagSchema.shape.color.optional(),
+    colorPriority: tagSchema.shape.colorPriority.optional(),
+  }),
   z.strictObject({
     type: z.literal('tag.update'),
     id: idSchema,
-    patch: tagSchema.pick({ name: true, order: true, archivedAt: true }).partial(),
+    patch: tagSchema
+      .pick({ name: true, color: true, colorPriority: true, order: true, archivedAt: true })
+      .partial(),
   }),
   z.strictObject({
     type: z.literal('task.create'),
@@ -66,6 +76,7 @@ export const operationSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('task.update'),
     id: idSchema,
+    propagateTags: z.boolean().optional(),
     patch: taskSchema
       .pick({
         title: true,
@@ -104,8 +115,11 @@ export const preferencesSchema = z.strictObject({
   panelWidth: z.number().min(200).max(700),
   hiddenTags: z.array(idSchema),
   hiddenTasks: z.array(idSchema),
-  hiddenStatuses: z.array(z.enum(['todo', 'in_progress', 'done'])),
+  hiddenStatuses: z.array(z.enum(['todo', 'done'])),
   showArchived: z.boolean(),
+  dayStart: z.number().int().min(0).max(1439),
+  dayEnd: z.number().int().min(1).max(1440),
+  inheritParentTags: z.boolean(),
 });
 export const settingsPatchSchema = z.strictObject({
   approvalMode: z.enum(['require_confirmation', 'auto_accept']).optional(),

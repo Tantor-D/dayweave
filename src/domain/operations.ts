@@ -1,3 +1,4 @@
+import { defaultTagColor } from './tags.ts';
 import { migrateWorkspace } from './migration.ts';
 import { ancestors, treeOrder } from './tree.ts';
 import { randomUUID } from 'node:crypto';
@@ -26,12 +27,14 @@ export function validDate(value: string): boolean {
 }
 export function emptyWorkspace(): Workspace {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     revision: 0,
     timezone: 'Asia/Shanghai',
     tags: ['P0', 'P1', 'P2', 'P3', 'P4'].map((name, order) => ({
       id: name,
       name,
+      color: defaultTagColor(name),
+      colorPriority: order,
       order,
       archivedAt: null,
     })),
@@ -39,7 +42,12 @@ export function emptyWorkspace(): Workspace {
   };
 }
 export function validateWorkspace(value: unknown): Workspace {
-  if (value && typeof value === 'object' && 'schemaVersion' in value && value.schemaVersion === 1)
+  if (
+    value &&
+    typeof value === 'object' &&
+    'schemaVersion' in value &&
+    [1, 2].includes(Number(value.schemaVersion))
+  )
     value = migrateWorkspace(value);
   const parsed = workspaceSchema.safeParse(value);
   if (!parsed.success)
@@ -94,6 +102,7 @@ export function applyOperations(
   before: Workspace,
   operations: Operation[],
   now = new Date().toISOString(),
+  options = { inheritParentTags: true },
 ): { workspace: Workspace; completionEvents: Change['completionEvents'] } {
   const w = structuredClone(before);
   const completionEvents: Change['completionEvents'] = [];
@@ -107,6 +116,8 @@ export function applyOperations(
         w.tags.push({
           id: op.id ?? randomUUID(),
           name: op.name,
+          color: op.color ?? defaultTagColor(op.name),
+          colorPriority: op.colorPriority ?? w.tags.length,
           order: w.tags.length,
           archivedAt: null,
         });
@@ -121,7 +132,12 @@ export function applyOperations(
           description: op.description ?? '',
           status: 'todo',
           parentId: op.parentId ?? null,
-          tagIds: op.tagIds ?? [],
+          tagIds: [
+            ...new Set([
+              ...(op.tagIds ?? []),
+              ...(options.inheritParentTags && op.parentId ? task(op.parentId).tagIds : []),
+            ]),
+          ],
           order: w.tasks.length,
           createdAt: now,
           updatedAt: now,
@@ -134,10 +150,24 @@ export function applyOperations(
       case 'task.update': {
         const t = task(op.id);
         const previousStatus = t.status;
+        const previousTags = [...t.tagIds];
+        const previousParent = t.parentId;
         Object.assign(t, op.patch);
+        if (options.inheritParentTags && t.parentId && t.parentId !== previousParent)
+          t.tagIds = [...new Set([...t.tagIds, ...task(t.parentId).tagIds])];
         if (previousStatus !== t.status) t.completedAt = t.status === 'done' ? now : null;
         t.updatedAt = now;
         validateTree(w);
+        if (op.propagateTags && (op.patch.tagIds || t.parentId !== previousParent)) {
+          const removed = previousTags.filter((id) => !t.tagIds.includes(id));
+          for (const child of w.tasks)
+            if (ancestors(child, w.tasks).some((a) => a.id === t.id)) {
+              child.tagIds = [
+                ...new Set([...child.tagIds.filter((id) => !removed.includes(id)), ...t.tagIds]),
+              ];
+              child.updatedAt = now;
+            }
+        }
         if (op.patch.status === 'done') {
           for (const child of w.tasks)
             if (ancestors(child, w.tasks).some((a) => a.id === t.id)) {
@@ -196,7 +226,7 @@ export function applyOperations(
         parent.completedAt = now;
         parent.updatedAt = now;
       } else if (!done && parent.status === 'done') {
-        parent.status = 'in_progress';
+        parent.status = 'todo';
         parent.completedAt = null;
         parent.updatedAt = now;
       }

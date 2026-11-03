@@ -69,7 +69,7 @@ test('domain: tree defaults, completion, reopening and reference validation', ()
   const reopened = applyOperations(done.workspace, [
     { type: 'task.update', id: 'child', patch: { status: 'todo' } },
   ]).workspace;
-  assert.equal(reopened.tasks[0].status, 'in_progress');
+  assert.equal(reopened.tasks[0].status, 'todo');
   assert.equal(reopened.tasks[1].completedAt, null);
   for (const patch of [
     { parentId: 'missing' },

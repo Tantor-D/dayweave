@@ -6,14 +6,18 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Check, GripVertical } from 'lucide-react';
-import type { Operation, Placement, Task } from '../domain/types';
+import { taskColor } from '../domain/tags';
+import { ancestors } from '../domain/tree';
+import type { Operation, Placement, Task, Tag } from '../domain/types';
 import {
   atMinute,
   clockLabel,
   selectedRange,
   placementAt,
   segmentsFor,
-  snap,
+  windowMinute,
+  placementInWindow,
+  minuteLabel,
   today,
   weekday,
 } from './time';
@@ -32,8 +36,14 @@ interface DragState {
   moved: boolean;
   offset: number;
   preview?: Placement;
+  parentTarget?: { id: string; title: string };
 }
-export function useScheduleDrag(save: (ops: Operation[], summary: string) => Promise<unknown>) {
+export function useScheduleDrag(
+  save: (ops: Operation[], summary: string) => Promise<unknown>,
+  tasks: Task[] = [],
+) {
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
   const [drag, setDrag] = useState<DragState | null>(null);
   const latest = useRef<DragState | null>(null),
     suppressedUntil = useRef(0),
@@ -55,7 +65,13 @@ export function useScheduleDrag(save: (ops: Operation[], summary: string) => Pro
           ? (event.clientX - rect.left) / rect.width
           : (event.clientY - rect.top) / rect.height;
       offset =
-        Date.parse(atMinute(cell.dataset.timeDate!, ratio * 1440)) - Date.parse(placement.startAt);
+        Date.parse(
+          atMinute(
+            cell.dataset.timeDate!,
+            Number(cell.dataset.dayStart ?? 0) +
+              ratio * (Number(cell.dataset.dayEnd ?? 1440) - Number(cell.dataset.dayStart ?? 0)),
+          ),
+        ) - Date.parse(placement.startAt);
     }
     const next = {
       task,
@@ -73,14 +89,24 @@ export function useScheduleDrag(save: (ops: Operation[], summary: string) => Pro
   useEffect(() => {
     if (!drag) return;
     const move = (event: PointerEvent) => {
-      const previous = latest.current!;
+      const previous = latest.current;
+      if (!previous) return;
       if (!previous.moved && Math.hypot(event.clientX - previous.x, event.clientY - previous.y) < 5)
         return;
       event.preventDefault();
       const el = document
         .elementFromPoint(event.clientX, event.clientY)
-        ?.closest('[data-time-date],[data-day-date]') as HTMLElement | null;
+        ?.closest('[data-time-date],[data-day-date],[data-task-drop]') as HTMLElement | null;
       let preview: Placement | undefined;
+      const target = tasksRef.current.find((t) => t.id === el?.dataset.taskDrop);
+      const parentTarget =
+        !previous.original &&
+        target &&
+        target.id !== previous.task.id &&
+        target.status !== 'done' &&
+        !ancestors(target, tasksRef.current).some((t) => t.id === previous.task.id)
+          ? { id: target.id, title: target.title }
+          : undefined;
       if (el?.dataset.dayDate && previous.mode === 'move')
         preview = {
           id: previous.original?.id ?? crypto.randomUUID(),
@@ -94,11 +120,11 @@ export function useScheduleDrag(save: (ops: Operation[], summary: string) => Pro
             ? (event.clientX - rect.left) / rect.width
             : (event.clientY - rect.top) / rect.height;
         const original = previous.original?.kind === 'timed' ? previous.original : undefined;
+        const dayStart = Number(el.dataset.dayStart ?? 0),
+          dayEnd = Number(el.dataset.dayEnd ?? 1440);
         const raw = atMinute(
-          el.dataset.timeDate,
-          previous.mode === 'end'
-            ? Math.max(0, Math.min(1440, Math.round((ratio * 1440) / 15) * 15))
-            : snap(ratio * 1440),
+          el.dataset.timeDate!,
+          windowMinute(ratio, dayStart, dayEnd, previous.mode === 'end'),
         );
         if (previous.mode === 'start' && original)
           preview = {
@@ -123,12 +149,24 @@ export function useScheduleDrag(save: (ops: Operation[], summary: string) => Pro
             startAt,
             endAt: new Date(
               Date.parse(startAt) +
-                (original ? Date.parse(original.endAt) - Date.parse(original.startAt) : 3600000),
+                (original
+                  ? Date.parse(original.endAt) - Date.parse(original.startAt)
+                  : Math.min(
+                      3600000,
+                      Date.parse(atMinute(el.dataset.timeDate!, dayEnd)) - Date.parse(startAt),
+                    )),
             ).toISOString(),
           };
         }
       }
-      const next = { ...previous, moved: true, x: event.clientX, y: event.clientY, preview };
+      const next = {
+        ...previous,
+        moved: true,
+        x: event.clientX,
+        y: event.clientY,
+        preview,
+        parentTarget,
+      };
       latest.current = next;
       setDrag(next);
     };
@@ -138,7 +176,18 @@ export function useScheduleDrag(save: (ops: Operation[], summary: string) => Pro
       setDrag(null);
       if (current?.moved) {
         suppressedUntil.current = Date.now() + 350;
-        if (current.preview)
+        if (current.parentTarget)
+          void dragSaveRef.current(
+            [
+              {
+                type: 'task.update',
+                id: current.task.id,
+                patch: { parentId: current.parentTarget.id },
+              },
+            ],
+            '调整父任务',
+          );
+        else if (current.preview)
           void dragSaveRef.current(
             [{ type: 'placement.put', taskId: current.task.id, placement: current.preview }],
             `安排「${current.task.title}」`,
@@ -170,6 +219,9 @@ export function useScheduleDrag(save: (ops: Operation[], summary: string) => Pro
 }
 interface Props {
   tasks: Task[];
+  tags: Tag[];
+  dayStart: number;
+  dayEnd: number;
   dates: string[];
   orientation: 'vertical' | 'horizontal';
   onSelect: (id: string) => void;
@@ -180,6 +232,9 @@ interface Props {
 }
 export function Timeline({
   tasks,
+  tags,
+  dayStart,
+  dayEnd,
   dates,
   orientation,
   onSelect,
@@ -232,9 +287,16 @@ export function Timeline({
           : (event.clientY - rect.top) / rect.height;
       const endpoint = atMinute(
         cell.dataset.timeDate!,
-        Math.max(0, Math.min(1440, Math.round((ratio * 1440) / 15) * 15)),
+        windowMinute(ratio, Number(cell.dataset.dayStart), Number(cell.dataset.dayEnd), true),
       );
       const next = selectedRange(state.anchor, endpoint, state.id);
+      if (state.anchor === endpoint)
+        next.endAt = new Date(
+          Math.min(
+            Date.parse(next.endAt),
+            Date.parse(atMinute(cell.dataset.timeDate!, Number(cell.dataset.dayEnd))),
+          ),
+        ).toISOString();
       state.placement = next;
       setRange(next);
     };
@@ -272,17 +334,17 @@ export function Timeline({
     const el = scroll.current;
     if (el) {
       if (orientation === 'vertical') {
-        el.scrollTop = 7 * 56;
+        el.scrollTop = (Math.max(0, 7 * 60 - dayStart) / 60) * 56;
         el.scrollLeft = 0;
       } else {
-        el.scrollLeft = 7 * 90;
+        el.scrollLeft = (Math.max(0, 7 * 60 - dayStart) / 60) * 90;
         el.scrollTop = 0;
       }
     }
     selection.current = null;
     setSelecting(false);
     setRange(undefined);
-  }, [orientation, dates[0]]);
+  }, [orientation, dates[0], dayStart, dayEnd]);
   const renderTasks = tasks.map((task) =>
     preview?.preview && task.id === preview.task.id
       ? {
@@ -294,7 +356,7 @@ export function Timeline({
         }
       : task,
   );
-  const all = dates.map((date) => segmentsFor(renderTasks, date));
+  const all = dates.map((date) => segmentsFor(renderTasks, date, dayStart, dayEnd));
   const horizontal = orientation === 'horizontal';
   const daySizes = all.map((segments) =>
     Math.max(
@@ -302,10 +364,33 @@ export function Timeline({
       Math.max(1, ...segments.map((x) => x.lanes)) * (horizontal ? 66 : 104),
     ),
   );
-  const timeSize = horizontal ? 2160 : 1344;
+  const rowHeights = dates.map((date, i) =>
+    Math.min(
+      284,
+      Math.max(
+        daySizes[i],
+        64 +
+          renderTasks.reduce(
+            (n, t) => n + t.placements.filter((p) => p.kind === 'day' && p.date === date).length,
+            0,
+          ) *
+            30,
+      ),
+    ),
+  );
+  const duration = dayEnd - dayStart;
+  const timeSize = (duration / 60) * (horizontal ? 90 : 56);
+  const ticks = [
+    dayStart,
+    ...Array.from(
+      { length: Math.max(0, Math.ceil(dayEnd / 60) - Math.floor(dayStart / 60) - 1) },
+      (_, i) => (Math.floor(dayStart / 60) + i + 1) * 60,
+    ),
+  ];
   const weekStyle = {
     '--day-count': dates.length,
     '--time-size': `${timeSize}px`,
+    '--grid-offset': `${(-(dayStart % 60) / 60) * (horizontal ? 90 : 56)}px`,
     '--day-columns': daySizes.map((n) => `minmax(${n}px, 1fr)`).join(' '),
     '--board-min-width': `${daySizes.reduce((a, b) => a + b, 56)}px`,
   } as CSSProperties;
@@ -350,6 +435,7 @@ export function Timeline({
                     key={date}
                     date={date}
                     tasks={renderTasks}
+                    tags={tags}
                     onDrag={onDrag}
                     onSelect={onSelect}
                     onSchedule={onSchedule}
@@ -363,13 +449,18 @@ export function Timeline({
               <div className={s.horizontalHours}>
                 <div className={s.rowDate}>日期 / 时间</div>
                 <div className={s.hourRow}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <span key={h}>{String(h).padStart(2, '0')}:00</span>
+                  {ticks.map((minute) => (
+                    <span
+                      key={minute}
+                      style={{ position: 'absolute', left: ((minute - dayStart) / 60) * 90 }}
+                    >
+                      {minuteLabel(minute)}
+                    </span>
                   ))}
                 </div>
               </div>
               {dates.map((date, index) => (
-                <div className={s.horizontalDay} key={date} style={{ minHeight: daySizes[index] }}>
+                <div className={s.horizontalDay} key={date} style={{ height: rowHeights[index] }}>
                   <div className={s.rowDate}>
                     <b>
                       {date.slice(5)} {weekday(date)}
@@ -377,26 +468,38 @@ export function Timeline({
                     <DayDrop
                       date={date}
                       tasks={renderTasks}
+                      tags={tags}
                       onDrag={onDrag}
                       onSelect={onSelect}
                       onSchedule={onSchedule}
                     />
                   </div>
-                  <div
-                    className={s.timeCell}
-                    data-time-date={date}
-                    data-axis="horizontal"
-                    style={{ height: daySizes[index] }}
-                    {...scheduleEvents(date)}
-                  >
-                    {all[index].map((seg) => renderSegment(seg, daySizes[index]))}
-                    {renderRange(date)}
-                    {date === today() && (
-                      <div
-                        className={s.nowLine}
-                        style={{ left: `${(minutesNow / 1440) * 100}%` }}
-                      />
-                    )}
+                  <div className={s.dayTimeScroll}>
+                    <div
+                      className={s.timeCell}
+                      data-time-date={date}
+                      data-day-start={dayStart}
+                      data-day-end={dayEnd}
+                      data-axis="horizontal"
+                      style={{ height: Math.max(rowHeights[index], daySizes[index]) }}
+                      {...scheduleEvents(date)}
+                    >
+                      {all[index].map((seg) =>
+                        renderSegment(
+                          seg,
+                          horizontal
+                            ? Math.max(rowHeights[index], daySizes[index])
+                            : daySizes[index],
+                        ),
+                      )}
+                      {renderRange(date)}
+                      {date === today() && minutesNow >= dayStart && minutesNow < dayEnd && (
+                        <div
+                          className={s.nowLine}
+                          style={{ left: `${((minutesNow - dayStart) / duration) * 100}%` }}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -404,9 +507,9 @@ export function Timeline({
           ) : (
             <div className={s.timeBody}>
               <div className={s.hourLabels}>
-                {Array.from({ length: 24 }, (_, h) => (
-                  <span key={h} style={{ top: h * 56 }}>
-                    {String(h).padStart(2, '0')}:00
+                {ticks.map((minute) => (
+                  <span key={minute} style={{ top: ((minute - dayStart) / 60) * 56 }}>
+                    {minuteLabel(minute)}
                   </span>
                 ))}
               </div>
@@ -416,12 +519,22 @@ export function Timeline({
                   className={s.timeCell}
                   data-time-date={date}
                   data-axis="vertical"
+                  data-day-start={dayStart}
+                  data-day-end={dayEnd}
                   {...scheduleEvents(date)}
                 >
-                  {all[index].map((seg) => renderSegment(seg, daySizes[index]))}
+                  {all[index].map((seg) =>
+                    renderSegment(
+                      seg,
+                      horizontal ? Math.max(rowHeights[index], daySizes[index]) : daySizes[index],
+                    ),
+                  )}
                   {renderRange(date)}
-                  {date === today() && (
-                    <div className={s.nowLine} style={{ top: `${(minutesNow / 1440) * 100}%` }} />
+                  {date === today() && minutesNow >= dayStart && minutesNow < dayEnd && (
+                    <div
+                      className={s.nowLine}
+                      style={{ top: `${((minutesNow - dayStart) / duration) * 100}%` }}
+                    />
                   )}
                 </div>
               ))}
@@ -429,20 +542,15 @@ export function Timeline({
           )}
         </div>
       </div>
-      <div className={s.boardFoot}>
-        <span>
-          <span className={s.liveDot} />
-          本机保存 · Asia/Shanghai
-        </span>
-        <span>拖选范围安排 · 点击任务编辑 · 边缘拉伸</span>
-      </div>
       {preview?.moved && (
         <div className={s.dragTip} style={{ left: preview.x + 16, top: preview.y + 16 }}>
-          {preview.preview
-            ? preview.preview.kind === 'day'
-              ? `${preview.preview.date} · 未定时`
-              : `${clockLabel(preview.preview.startAt)} — ${clockLabel(preview.preview.endAt)}`
-            : '拖到日期或时间轴'}
+          {preview.parentTarget
+            ? '设为「' + preview.parentTarget.title + '」的子任务'
+            : preview.preview
+              ? preview.preview.kind === 'day'
+                ? `${preview.preview.date} · 未定时`
+                : `${clockLabel(preview.preview.startAt)} — ${clockLabel(preview.preview.endAt)}`
+              : '拖到日期或时间轴'}
           <small>Esc 取消</small>
         </div>
       )}
@@ -464,11 +572,13 @@ export function Timeline({
         event.preventDefault();
         event.currentTarget.focus({ preventScroll: true });
         const rect = event.currentTarget.getBoundingClientRect();
-        const initial = placementAt(
+        const initial = placementInWindow(
           date,
           horizontal
             ? (event.clientX - rect.left) / rect.width
             : (event.clientY - rect.top) / rect.height,
+          dayStart,
+          dayEnd,
         );
         if (initial.kind !== 'timed') return;
         selection.current = {
@@ -491,7 +601,9 @@ export function Timeline({
       onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
-          onSchedule(placementAt(date, 9 / 24));
+          onSchedule(
+            placementInWindow(date, Math.max(0, (540 - dayStart) / duration), dayStart, dayEnd),
+          );
         }
       },
     };
@@ -499,19 +611,19 @@ export function Timeline({
   function renderRange(date: string) {
     if (!range) return null;
     const midnight = Date.parse(atMinute(date, 0));
-    const start = Math.max(0, (Date.parse(range.startAt) - midnight) / 60000);
-    const end = Math.min(1440, (Date.parse(range.endAt) - midnight) / 60000);
+    const start = Math.max(dayStart, (Date.parse(range.startAt) - midnight) / 60000);
+    const end = Math.min(dayEnd, (Date.parse(range.endAt) - midnight) / 60000);
     if (end <= start) return null;
     const style = horizontal
       ? {
-          left: (start / 1440) * timeSize,
-          width: ((end - start) / 1440) * timeSize,
+          left: ((start - dayStart) / duration) * timeSize,
+          width: ((end - start) / duration) * timeSize,
           top: 2,
           bottom: 2,
         }
       : {
-          top: (start / 1440) * timeSize,
-          height: ((end - start) / 1440) * timeSize,
+          top: ((start - dayStart) / duration) * timeSize,
+          height: ((end - start) / duration) * timeSize,
           left: 2,
           right: 2,
         };
@@ -525,14 +637,14 @@ export function Timeline({
     const { task, placement } = seg;
     const css: CSSProperties = horizontal
       ? {
-          left: (seg.start / 1440) * timeSize,
-          width: Math.max(((seg.end - seg.start) / 1440) * timeSize, 20),
+          left: ((seg.start - dayStart) / duration) * timeSize,
+          width: Math.max(((seg.end - seg.start) / duration) * timeSize, 20),
           top: (seg.lane / seg.lanes) * size + 5,
           height: size / seg.lanes - 10,
         }
       : {
-          top: (seg.start / 1440) * timeSize,
-          height: Math.max(((seg.end - seg.start) / 1440) * timeSize, 14),
+          top: ((seg.start - dayStart) / duration) * timeSize,
+          height: Math.max(((seg.end - seg.start) / duration) * timeSize, 14),
           left: `calc(${(seg.lane / seg.lanes) * 100}% + 5px)`,
           width: `calc(${100 / seg.lanes}% - 10px)`,
         };
@@ -544,7 +656,9 @@ export function Timeline({
         tabIndex={0}
         aria-label={`${task.title} ${clockLabel(placement.startAt)} 至 ${clockLabel(placement.endAt)}`}
         className={`${s.timeBlock} ${s.taskColor} ${task.status === 'done' ? s.done : ''} ${selectedId === task.id ? s.selected : ''} ${preview?.original?.id === placement.id ? s.dragging : ''}`}
-        style={css}
+        style={
+          { ...css, '--task-color': taskColor(task, tags) ?? 'var(--accent)' } as CSSProperties
+        }
         onPointerDown={(e) => onDrag(e, task, placement)}
         onClick={() => onSelect(task.id)}
         onKeyDown={(e) => {
@@ -582,12 +696,14 @@ export function Timeline({
 }
 function DayDrop({
   date,
+  tags,
   tasks,
   onDrag,
   onSelect,
   onSchedule,
 }: {
   date: string;
+  tags: Tag[];
   tasks: Task[];
   onDrag: DragStart;
   onSelect: (id: string) => void;
@@ -621,6 +737,7 @@ function DayDrop({
           data-placement={p.id}
           role="button"
           tabIndex={0}
+          style={{ '--task-color': taskColor(task, tags) ?? 'var(--accent)' } as CSSProperties}
           className={`${s.dayChip} ${s.taskColor} ${task.status === 'done' ? s.done : ''}`}
           onPointerDown={(e) => onDrag(e, task, p)}
           onClick={() => onSelect(task.id)}

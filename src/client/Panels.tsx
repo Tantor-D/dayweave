@@ -1,3 +1,4 @@
+import { minuteLabel, parseClock } from './time';
 import { TaskFields } from './TaskFields';
 import { taskPath } from '../domain/tree';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -33,7 +34,7 @@ import type {
 import { api, commit, readDocument } from './api';
 import { clockLabel, localInput, localToUTC, today, taskOnDay } from './time';
 import s from './App.module.css';
-export const statusLabels = { todo: '待办', in_progress: '进行中', done: '已完成' };
+export const statusLabels = { todo: '未完成', done: '已完成' };
 export type Save = (operations: Operation[], summary: string) => Promise<boolean>;
 export type Notify = (message: string, error?: boolean) => void;
 export interface PanelProps {
@@ -381,6 +382,8 @@ export function FilterPanel({
 }
 export function OrganizationPanel({ workspace, save }: PanelProps) {
   const [name, setName] = useState('');
+  const [color, setColor] = useState('#537fc5');
+  const [priority, setPriority] = useState(workspace.tags.length);
   return (
     <div className={s.panelContent}>
       <h2>标签管理</h2>
@@ -389,7 +392,13 @@ export function OrganizationPanel({ workspace, save }: PanelProps) {
         className={s.form}
         onSubmit={async (e) => {
           e.preventDefault();
-          if (await save([{ type: 'tag.create', name: name.trim() }], '创建标签')) setName('');
+          if (
+            await save(
+              [{ type: 'tag.create', name: name.trim(), color, colorPriority: priority }],
+              '创建标签',
+            )
+          )
+            setName('');
         }}
       >
         <label>
@@ -402,22 +411,54 @@ export function OrganizationPanel({ workspace, save }: PanelProps) {
             onChange={(e) => setName(e.target.value)}
           />
         </label>
+        <label>
+          颜色
+          <input
+            aria-label="新标签颜色"
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+          />
+        </label>
+        <label>
+          颜色优先级（数值越小越优先）
+          <input
+            aria-label="新标签颜色优先级"
+            type="number"
+            min={0}
+            max={9999}
+            required
+            value={priority}
+            onChange={(e) => setPriority(Number(e.target.value))}
+          />
+        </label>
         <button className={s.primary}>创建标签</button>
       </form>
       {workspace.tags.map((tag) => (
-        <TagEditor key={tag.id + tag.name} tag={tag} save={save} />
+        <TagEditor key={tag.id + tag.name + tag.color + tag.colorPriority} tag={tag} save={save} />
       ))}
     </div>
   );
 }
 function TagEditor({ tag, save }: { tag: Workspace['tags'][number]; save: Save }) {
   const [name, setName] = useState(tag.name);
+  const [color, setColor] = useState(tag.color);
+  const [priority, setPriority] = useState(tag.colorPriority);
   return (
     <form
       className={s.form}
       onSubmit={(e) => {
         e.preventDefault();
-        void save([{ type: 'tag.update', id: tag.id, patch: { name: name.trim() } }], '更新标签');
+        void save(
+          [
+            {
+              type: 'tag.update',
+              id: tag.id,
+              patch: { name: name.trim(), color, colorPriority: priority },
+            },
+          ],
+          '更新标签',
+        );
       }}
     >
       <label>
@@ -427,6 +468,27 @@ function TagEditor({ tag, save }: { tag: Workspace['tags'][number]; save: Save }
           pattern={'[^\\/]+'}
           value={name}
           onChange={(e) => setName(e.target.value)}
+        />
+      </label>
+      <label>
+        颜色
+        <input
+          aria-label={tag.name + ' 颜色'}
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+        />
+      </label>
+      <label>
+        颜色优先级（数值越小越优先）
+        <input
+          aria-label={tag.name + ' 颜色优先级'}
+          type="number"
+          min={0}
+          max={9999}
+          required
+          value={priority}
+          onChange={(e) => setPriority(Number(e.target.value))}
         />
       </label>
       <div className={s.buttonRow}>
@@ -914,7 +976,17 @@ export function HistoryPanel({
     </div>
   );
 }
-export function SettingsPanel({ notify, onSettings }: { notify: Notify; onSettings: () => void }) {
+export function SettingsPanel({
+  notify,
+  onSettings,
+  preferences,
+  updatePreferences,
+}: {
+  notify: Notify;
+  onSettings: () => void;
+  preferences: Preferences;
+  updatePreferences: (patch: Partial<Preferences>) => Promise<boolean>;
+}) {
   const [settings, setSettings] = useState<UserSettings>(),
     [apiKey, setKey] = useState(''),
     [busy, setBusy] = useState(false);
@@ -953,7 +1025,9 @@ export function SettingsPanel({ notify, onSettings }: { notify: Notify; onSettin
   if (!settings) return <div className={s.panelContent}>正在读取设置…</div>;
   return (
     <div className={s.panelContent}>
-      <h2>AI 与本机设置</h2>
+      <h2>工作台设置</h2>
+      <WorkbenchSettings preferences={preferences} update={updatePreferences} />
+      <h3>AI 与本机设置</h3>
       <form className={s.form} onSubmit={(e) => void submit(e)}>
         <label>
           AI 写入策略
@@ -1351,5 +1425,76 @@ export function AiPanel({
         </div>
       </form>
     </div>
+  );
+}
+
+function WorkbenchSettings({
+  preferences,
+  update,
+}: {
+  preferences: Preferences;
+  update: (patch: Partial<Preferences>) => Promise<boolean>;
+}) {
+  const [start, setStart] = useState(minuteLabel(preferences.dayStart));
+  const [end, setEnd] = useState(minuteLabel(preferences.dayEnd));
+  const [inherit, setInherit] = useState(preferences.inheritParentTags);
+  const [error, setError] = useState(''),
+    [busy, setBusy] = useState(false);
+  return (
+    <form
+      className={s.form}
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const dayStart = parseClock(start),
+          dayEnd = parseClock(end);
+        if (!Number.isFinite(dayStart) || !Number.isFinite(dayEnd) || dayStart >= dayEnd) {
+          setError('请输入有效的 HH:MM，结束晚于开始，最晚 24:00。');
+          return;
+        }
+        setError('');
+        setBusy(true);
+        try {
+          if (!(await update({ dayStart, dayEnd, inheritParentTags: inherit })))
+            setError('设置保存失败，请重试。');
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label>
+        每天开始时间
+        <input
+          aria-label="每天开始时间"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          required
+        />
+      </label>
+      <label>
+        每天结束时间
+        <input
+          aria-label="每天结束时间"
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+          required
+        />
+      </label>
+      <p className={s.hint}>仅调整时间轴显示与拖选范围，范围外排期保留。结束可填 24:00。</p>
+      <label className={s.checkRow}>
+        <input type="checkbox" checked={inherit} onChange={(e) => setInherit(e.target.checked)} />
+        子任务复制继承父任务标签
+      </label>
+      <p className={s.hint}>
+        新建或更换父任务时复制标签；后续可独立修改。父任务标签变更时另行询问是否同步后代。
+      </p>
+      {error && (
+        <p role="alert" className={s.errorText}>
+          {error}
+        </p>
+      )}
+      <button className={s.primary} disabled={busy}>
+        保存工作台设置
+      </button>
+    </form>
   );
 }

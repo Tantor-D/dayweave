@@ -2,7 +2,7 @@
 
 ## 文档的关键结论
 
-`v0.2.0 / focus-workbench` 的网页 AI 与外部 harness 操作同一份本地数据，并共用校验、审批、版本冲突和历史恢复。默认 AI 写入需要网页确认；自动接受只省略人工确认，仍保存历史。真实模型需用户配置，自动测试使用模拟 HTTP 接口，不代表真实供应商连接已验证。
+`v0.3.0 / task-workbench` 的网页 AI 与外部 harness 操作同一份本地数据，并共用校验、审批、版本冲突和历史恢复。默认 AI 写入需要网页确认；自动接受只省略人工确认，仍保存历史。真实模型需用户配置，自动测试使用模拟 HTTP 接口，不代表真实供应商连接已验证。
 
 - 数据本体是 `data/workspace.json`、`data/ai/*.md` 和 `data/reflections/**/*.md`；外部工具可以直接阅读，但规范修改应使用下述接口。
 - 每轮安排前调用 `context`，读取最新长期背景、短期安排和任务版本；反思正文仅在明确选择后读取，不默认读取整个反思或历史目录。
@@ -85,6 +85,25 @@ npm run --silent harness -- submit 返回的提案ID --request-id 本次唯一�
 `preview` 返回持久化提案 ID 和真实前后内容。`submit` 返回 `pending_confirmation` 时，在网页打开提案并确认；`applied` 代表保存完成，可追踪 `changeId`。冲突时重新读取并生成新提案。网络超时后使用**同一提案与同一 requestId**重试，不重复创建；提案已应用后重试会返回已有结果。
 
 操作名包括：`tag.create/update`、`task.create/update`、`placement.put/remove`、`text.write`。归档使用 update 中的 `archivedAt`，恢复设为 `null`；完成任务使用 `status: "done"`。任务使用 `parentId` 保存父任务 ID，根任务为 `null`，用 `tagIds` 保存多个标签 ID；标签名称禁止包含 "/"。父任务完成会完成后代；全部子任务完成会向上完成祖先；重新打开子任务会重新打开祖先。联动可能影响当前选择范围外的同树任务，提案须明确影响。拖动已有排期时沿用其 ID；一个任务可有多个定时安排，允许重叠。
+
+## 任务状态、颜色与标签传播
+
+任务状态只接受 `todo`（未完成）和 `done`（已完成）。旧快照中的 `in_progress` 在迁移及恢复时转换为 `todo`。
+
+标签可配置 `color`（如 `#537fc5`）与 `colorPriority`（0–9999，越小越优先）。多标签同优先级时按标签顺序及 ID 稳定取色；归档标签不参与颜色选择。
+
+新建任务或修改 parentId 时，服务端按当前复制继承设置合并父标签。修改子任务标签不会改变父任务。更新父任务标签默认仅影响自身；只有用户明确同意同步后代时，才在 task.update 上设置 `propagateTags: true`：
+
+```json
+{
+  "type": "task.update",
+  "id": "parent-task",
+  "patch": { "tagIds": ["tag-current"] },
+  "propagateTags": true
+}
+```
+
+此操作向全部后代合并父任务当前标签，并从后代移除本次在父任务删除的标签；保留后代其余标签。提案说明须明确新增／移除标签与后代影响，不将父任务名称的变化解释为标签传播授权。
 
 ## 背景、反思与历史
 

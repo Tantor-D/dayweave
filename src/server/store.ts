@@ -54,6 +54,9 @@ const defaults: Preferences = {
   hiddenTasks: [],
   hiddenStatuses: [],
   showArchived: false,
+  dayStart: 0,
+  dayEnd: 1440,
+  inheritParentTags: true,
 };
 const modelDefaults: ModelConfig = {
   approvalMode: 'require_confirmation',
@@ -332,12 +335,19 @@ export class Store {
         current &&
         current === this.known.get('workspace') &&
         !this.readonlyReasons.has('workspace') &&
-        JSON.parse(current).schemaVersion === 1
+        [1, 2].includes(JSON.parse(current).schemaVersion)
       ) {
         const migrated = validateWorkspace(JSON.parse(current));
         migrated.revision++;
         await atomicWrite(
-          join(this.historyDir, 'workspace-v1-' + hashContent(current) + '.backup'),
+          join(
+            this.historyDir,
+            'workspace-v' +
+              JSON.parse(current).schemaVersion +
+              '-' +
+              hashContent(current) +
+              '.backup',
+          ),
           current,
         );
         await this.commit(
@@ -347,7 +357,7 @@ export class Store {
             after: serialize(migrated),
             source: 'user',
             approval: 'manual',
-            summary: 'v0.2.0 迁移任务树与标签',
+            summary: 'v0.3.0 升级标签颜色与任务状态',
             requestId: randomUUID(),
             completionEvents: [],
           },
@@ -358,7 +368,7 @@ export class Store {
         if (
           p.target === 'workspace' &&
           ['preview', 'pending_confirmation'].includes(p.status) &&
-          JSON.parse(p.after).schemaVersion === 1
+          [1, 2].includes(JSON.parse(p.after).schemaVersion)
         ) {
           p.status = 'conflict';
           p.error = '任务模型已升级，请重新生成提案';
@@ -454,7 +464,9 @@ export class Store {
       this.assertBase(current, value.baseHash, value.baseRevision);
       let after: string;
       if (value.target === 'workspace') {
-        const result = applyOperations(current.data as Workspace, value.operations, this.now());
+        const result = applyOperations(current.data as Workspace, value.operations, this.now(), {
+          inheritParentTags: (await this.getPreferences()).inheritParentTags,
+        });
         result.workspace.revision++;
         after = serialize(result.workspace);
       } else {
@@ -791,13 +803,13 @@ export class Store {
             )
           : [];
         const { hiddenCategories, hiddenProjects, ...rest } = old;
-        return preferencesSchema.parse({
+        return parsePreferences({
           ...rest,
           hiddenTags,
           hiddenTasks: [...new Set([...old.hiddenTasks, ...hiddenRoots])],
         });
       }
-      return preferencesSchema.parse(parsed);
+      return parsePreferences(parsed);
     } catch {
       return coded(
         'INVALID_PREFERENCES',
@@ -814,6 +826,8 @@ export class Store {
         ...(await this.getPreferences()),
         ...parsed.data,
       });
+      if (preferences.dayStart >= preferences.dayEnd)
+        coded('VALIDATION_ERROR', '每日结束时间必须晚于开始时间');
       await atomicWrite(join(this.dataDir, 'preferences.json'), serialize(preferences));
       this.notify();
       return preferences;
@@ -897,4 +911,23 @@ export class Store {
     this.closed = true;
     await this.releaseLock();
   }
+}
+
+function parsePreferences(value: Record<string, unknown>): Preferences {
+  if (
+    !Array.isArray(value.hiddenStatuses) ||
+    value.hiddenStatuses.some((s) => !['todo', 'done', 'in_progress'].includes(s))
+  )
+    coded('INVALID_PREFERENCES', '状态筛选无效');
+  const p = preferencesSchema.parse({
+    dayStart: 0,
+    dayEnd: 1440,
+    inheritParentTags: true,
+    ...value,
+    hiddenStatuses: [
+      ...new Set((value.hiddenStatuses as string[]).map((s) => (s === 'in_progress' ? 'todo' : s))),
+    ],
+  });
+  if (p.dayStart >= p.dayEnd) coded('INVALID_PREFERENCES', '每日结束时间必须晚于开始时间');
+  return p;
 }

@@ -899,23 +899,6 @@
   left: -3px;
   top: -2px;
 }
-.boardFoot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 9px;
-  color: var(--muted);
-  padding: 12px 20px;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
-}
-.boardFoot > span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
 .dragTip {
   position: fixed;
   z-index: 100;
@@ -934,8 +917,8 @@
   margin-top: 4px;
 }
 .horizontal .boardCanvas {
-  width: 2310px;
-  min-width: 2310px;
+  width: calc(var(--time-size) + 150px);
+  min-width: calc(var(--time-size) + 150px);
 }
 .horizontalHours {
   height: 45px;
@@ -965,6 +948,7 @@
   margin: 0 4px 10px;
 }
 .hourRow {
+  position: relative;
   display: flex;
   width: var(--time-size);
   font-size: 9px;
@@ -978,6 +962,8 @@
 }
 .horizontalDay {
   display: flex;
+  max-height: 284px;
+  overflow: hidden;
 }
 .horizontal .dayDrop {
   border: 1px dashed var(--line);
@@ -1714,12 +1700,6 @@
   .panelContent {
     padding: 22px 17px;
   }
-  .boardFoot {
-    padding: 11px;
-  }
-  .boardFoot > span:last-child {
-    display: none;
-  }
   .headerActions {
     gap: 4px;
   }
@@ -1858,4 +1838,83 @@
 }
 .timeCell {
   touch-action: none;
+}
+
+/* Task hierarchy and bounded daily rows */
+.parentPicker {
+  position: relative;
+}
+.parentOptions {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--solid);
+  box-shadow: 0 8px 24px #0002;
+}
+.parentOptions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+}
+.parentOptions .active {
+  background: var(--surface);
+}
+.parentDropTarget {
+  outline: 2px solid var(--accent);
+  background: var(--surface);
+}
+.sidebarTabs select {
+  min-width: 0;
+  width: 55%;
+  font-size: 11px;
+}
+
+.horizontalDay > .rowDate {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+.dayTimeScroll {
+  width: var(--time-size);
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.timeCell {
+  background-position-y: var(--grid-offset);
+}
+.horizontal .timeCell {
+  background-position: var(--grid-offset) 0;
+}
+.allDayRow > .dayDrop {
+  max-height: 144px;
+  overflow-y: auto;
+}
+.timeBlock.done,
+.dayChip.done {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--task-color), var(--solid) 65%);
+  background: color-mix(in srgb, var(--task-color), var(--solid) 96%);
+  color: var(--muted);
+}
+.timeBlock.done .blockTitle {
+  opacity: 0.65;
+}
+
+.form .checkRow {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+.form .checkRow input {
+  width: auto;
+  flex-shrink: 0;
 }

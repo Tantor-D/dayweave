@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 import { validateLegacyWorkspace } from './legacy.ts';
-import type { Workspace, Task } from './types.ts';
+import { validateV2, type WorkspaceV2 } from './legacy-v2.ts';
+import type { Workspace } from './types.ts';
+import { defaultTagColor } from './tags.ts';
 
 export function migrateWorkspace(value: unknown): Workspace {
+  if (value && typeof value === 'object' && 'schemaVersion' in value && value.schemaVersion === 2)
+    return upgradeV2(value);
   const old = validateLegacyWorkspace(value);
-  const tags: Workspace['tags'] = [];
+  const tags: WorkspaceV2['tags'] = [];
   const tag = (name: string, archivedAt: string | null = null) => {
     const cleaned = name.replaceAll('/', '／').trim();
     const existing = tags.find((t) => t.name === cleaned);
@@ -30,18 +34,20 @@ export function migrateWorkspace(value: unknown): Workspace {
     occupied.add(id);
     projectIds.set(p.id, id);
   }
-  const tasks: Task[] = old.tasks.map(({ priority, projectId, categoryId, ...t }) => ({
-    ...t,
-    parentId: projectId ? projectIds.get(projectId)! : null,
-    tagIds: [
-      ...new Set([
-        tag(priority),
-        categories.get(
-          projectId ? old.projects.find((p) => p.id === projectId)!.categoryId : categoryId!,
-        )!,
-      ]),
-    ],
-  }));
+  const tasks: WorkspaceV2['tasks'] = old.tasks.map(
+    ({ priority, projectId, categoryId, ...t }) => ({
+      ...t,
+      parentId: projectId ? projectIds.get(projectId)! : null,
+      tagIds: [
+        ...new Set([
+          tag(priority),
+          categories.get(
+            projectId ? old.projects.find((p) => p.id === projectId)!.categoryId : categoryId!,
+          )!,
+        ]),
+      ],
+    }),
+  );
   for (const p of old.projects) {
     const children = tasks.filter((t) => t.parentId === projectIds.get(p.id));
     const done = children.length > 0 && children.every((t) => t.status === 'done');
@@ -71,5 +77,21 @@ export function migrateWorkspace(value: unknown): Workspace {
       placements: [],
     });
   }
-  return { schemaVersion: 2, timezone: old.timezone, revision: old.revision, tags, tasks };
+  return upgradeV2({
+    schemaVersion: 2,
+    timezone: old.timezone,
+    revision: old.revision,
+    tags,
+    tasks,
+  });
+}
+
+function upgradeV2(value: unknown): Workspace {
+  const old = validateV2(value);
+  return {
+    ...old,
+    schemaVersion: 3,
+    tags: old.tags.map((t, i) => ({ ...t, color: defaultTagColor(t.name), colorPriority: i })),
+    tasks: old.tasks.map((t) => ({ ...t, status: t.status === 'done' ? 'done' : 'todo' })),
+  };
 }

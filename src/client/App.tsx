@@ -1,4 +1,5 @@
-import { TaskFields, emptyTaskDraft } from './TaskFields';
+import { TagPropagationDialog, type TagConfirmation } from './TagPropagationDialog';
+import { TaskFields, emptyTaskDraft, InheritTagsContext } from './TaskFields';
 import { ancestors, taskPath, treeOrder } from '../domain/tree';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
@@ -8,7 +9,6 @@ import {
   Check,
   ChevronDown,
   Circle,
-  CircleDot,
   Columns3,
   Filter,
   Folder,
@@ -46,7 +46,15 @@ import {
   SettingsPanel,
   TaskDetail,
 } from './Panels';
-import { addDays, atMinute, datesFrom, today } from './time';
+import {
+  addDays,
+  atMinute,
+  datesFrom,
+  today,
+  filterDates,
+  taskOnDay,
+  type TaskDateFilter,
+} from './time';
 import { themeStyle, ViewLayout, ThemeContext, ThemeCard } from './themes';
 import s from './App.module.css';
 const initialPreferences: Preferences = {
@@ -58,6 +66,9 @@ const initialPreferences: Preferences = {
   hiddenTasks: [],
   hiddenStatuses: [],
   showArchived: false,
+  dayStart: 0,
+  dayEnd: 1440,
+  inheritParentTags: true,
 };
 type Panel =
   | 'task'
@@ -88,12 +99,14 @@ export default function App() {
     [panel, setPanel] = useState<Panel>(),
     [selected, setSelected] = useState<string>(),
     [search, setSearch] = useState(''),
+    [dateFilter, setDateFilter] = useState<TaskDateFilter>('all'),
     [newTask, setNewTask] = useState(false),
     [schedule, setSchedule] = useState<{ placement: Placement; base: Snapshot<Workspace> }>(),
     [busy, setBusy] = useState(false),
     [connected, setConnected] = useState(true),
     [toast, setToast] = useState<{ message: string; error: boolean }>(),
-    [bootError, setBootError] = useState('');
+    [bootError, setBootError] = useState(''),
+    [tagConfirmation, setTagConfirmation] = useState<TagConfirmation>();
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined),
     snapshotRef = useRef(snapshot),
     preferencesRef = useRef(preferences);
@@ -156,9 +169,58 @@ export default function App() {
     ) => {
       const snap = base ?? snapshotRef.current;
       if (!snap) return false;
+      const prepared: Operation[] = [];
+      for (const original of operations) {
+        let op = original;
+        if (
+          op.type === 'task.update' &&
+          op.patch.parentId &&
+          preferencesRef.current.inheritParentTags
+        ) {
+          const change = op;
+          const task = snap.data.tasks.find((t) => t.id === change.id);
+          const parent = snap.data.tasks.find((t) => t.id === change.patch.parentId);
+          if (task && parent && task.parentId !== parent.id)
+            op = {
+              ...op,
+              patch: {
+                ...op.patch,
+                tagIds: [...new Set([...(op.patch.tagIds ?? task.tagIds), ...parent.tagIds])],
+              },
+            };
+        }
+        if (op.type === 'task.update' && op.patch.tagIds && op.propagateTags === undefined) {
+          const task = snap.data.tasks.find((t) => t.id === op.id);
+          const count = snap.data.tasks.filter((t) =>
+            ancestors(t, snap.data.tasks).some((a) => a.id === op.id),
+          ).length;
+          if (
+            task &&
+            count &&
+            (task.tagIds.some((id) => !op.patch.tagIds!.includes(id)) ||
+              op.patch.tagIds.some((id) => !task.tagIds.includes(id)))
+          ) {
+            const names = (ids: string[]) =>
+              ids.map((id) => snap.data.tags.find((t) => t.id === id)?.name ?? id);
+            const answer = await new Promise<boolean | null>((resolve) =>
+              setTagConfirmation({
+                title: task.title,
+                count,
+                added: names(op.patch.tagIds!),
+                removed: names(task.tagIds.filter((id) => !op.patch.tagIds!.includes(id))),
+                resolve,
+              }),
+            );
+            if (answer === null) return false;
+            prepared.push({ ...op, propagateTags: answer });
+            continue;
+          }
+        }
+        prepared.push(op);
+      }
       setBusy(true);
       try {
-        await commit(snap, operations, summary);
+        await commit(snap, prepared, summary);
         await refresh();
         notify('已保存');
         return true;
@@ -178,12 +240,17 @@ export default function App() {
     setPreferences({ ...before, ...patch });
     try {
       setPreferences(await api<Preferences>('/preferences', patch, 'PATCH'));
+      return true;
     } catch (e) {
       setPreferences(before);
       notify((e as Error).message, true);
+      return false;
     }
   };
-  const { drag, start, canClick } = useScheduleDrag((ops, summary) => save(ops, summary, snapshot));
+  const { drag, start, canClick } = useScheduleDrag(
+    (ops, summary) => save(ops, summary, snapshot),
+    snapshot?.data.tasks ?? [],
+  );
   const select = (id: string) => {
     if (canClick()) {
       setSelected(id);
@@ -210,6 +277,14 @@ export default function App() {
         );
       })
       .sort((a, b) => a.order - b.order) || [];
+  const selectedDates = filterDates(dateFilter);
+  const sidebarHits = filteredTasks.filter(
+    (t) => dateFilter === 'all' || selectedDates.some((d) => taskOnDay(t, d)),
+  );
+  const sidebarIds = new Set(
+    sidebarHits.flatMap((t) => [t.id, ...ancestors(t, workspace?.tasks ?? []).map((a) => a.id)]),
+  );
+  const sidebarTasks = workspace?.tasks.filter((t) => sidebarIds.has(t.id)) ?? [];
   const filterCount =
     preferences.hiddenTags.length +
     preferences.hiddenTasks.length +
@@ -280,9 +355,10 @@ export default function App() {
   const taskRow = (task: Task) => (
     <div
       key={task.id}
+      data-task-drop={task.id}
       style={{ marginLeft: Math.min(ancestors(task, workspace?.tasks ?? []).length, 8) * 14 }}
       title={taskPath(task, workspace?.tasks ?? [])}
-      className={`${s.taskRow} ${selected === task.id && panel === 'task' ? s.selectedTask : ''} ${task.status === 'done' ? s.done : ''}`}
+      className={`${s.taskRow} ${selected === task.id && panel === 'task' ? s.selectedTask : ''} ${task.status === 'done' ? s.done : ''} ${drag?.parentTarget?.id === task.id ? s.parentDropTarget : ''}`}
       onPointerDown={(e) => start(e, task)}
       onClick={() => select(task.id)}
       onKeyDown={(e) => {
@@ -311,13 +387,7 @@ export default function App() {
             );
           }}
         >
-          {task.status === 'done' ? (
-            <Check size={16} />
-          ) : task.status === 'in_progress' ? (
-            <CircleDot size={16} />
-          ) : (
-            <Circle size={16} />
-          )}
+          {task.status === 'done' ? <Check size={16} /> : <Circle size={16} />}
         </button>
         <div className={s.taskText}>
           <span>{task.title}</span>
@@ -326,13 +396,6 @@ export default function App() {
               .filter((t) => task.tagIds.includes(t.id))
               .map((t) => t.name)
               .join(' · ')}
-            {task.placements.length > 0 && (
-              <>
-                <span>·</span>
-                <CalendarDays size={11} />
-                {task.placements.length} 次安排
-              </>
-            )}
             {task.archivedAt && ' · 已归档'}
           </small>
         </div>
@@ -342,368 +405,397 @@ export default function App() {
   );
   return (
     <ThemeContext.Provider value={preferences.theme}>
-      <div className={s.app} style={themeStyle(preferences.theme)} data-theme={preferences.theme}>
-        <header className={s.header}>
-          <div className={s.brand}>
-            <div className={s.brandMark}>
-              <span />
+      <InheritTagsContext.Provider value={preferences.inheritParentTags}>
+        <div className={s.app} style={themeStyle(preferences.theme)} data-theme={preferences.theme}>
+          <header className={s.header}>
+            <div className={s.brand}>
+              <div className={s.brandMark}>
+                <span />
+              </div>
+              <div>
+                <strong>留白</strong>
+                <span>专注工作台</span>
+              </div>
             </div>
-            <div>
-              <strong>留白</strong>
-              <span>专注工作台</span>
+            <div className={s.topCenter}>
+              <span className={s.liveDot} />
+              {busy ? '正在保存…' : connected ? '一切就绪，专注当下' : '连接中断，正在重连'}
             </div>
-          </div>
-          <div className={s.topCenter}>
-            <span className={s.liveDot} />
-            {busy ? '正在保存…' : connected ? '一切就绪，专注当下' : '连接中断，正在重连'}
-          </div>
-          <nav className={s.headerActions}>
-            <button
-              className={panel === 'background' ? s.active : ''}
-              onClick={() => togglePanel('background')}
-            >
-              <FileIcon />
-              背景
-            </button>
-            <button
-              className={panel === 'review' ? s.active : ''}
-              onClick={() => togglePanel('review')}
-            >
-              <CalendarDays size={16} />
-              回望
-            </button>
-            <button aria-label="修改历史" title="修改历史" onClick={() => togglePanel('history')}>
-              <History size={17} />
-            </button>
-            <button
-              aria-label="切换深浅主题"
-              title="切换深浅主题"
-              onClick={() =>
-                void updatePreferences({
-                  theme: preferences.theme === 'glass-light' ? 'glass-dark' : 'glass-light',
-                })
-              }
-            >
-              {preferences.theme === 'glass-light' ? <Moon size={17} /> : <Sun size={17} />}
-            </button>
-            <button aria-label="设置" title="设置" onClick={() => togglePanel('settings')}>
-              <Settings size={17} />
-            </button>
-            <button className={s.aiButton} onClick={() => togglePanel('ai')}>
-              <Sparkles size={15} />
-              AI 协作
-            </button>
-          </nav>
-        </header>
-        {!workspace ? (
-          <div className={s.loading}>
-            <div className={s.brandMark}>
-              <span />
+            <nav className={s.headerActions}>
+              <button
+                className={panel === 'background' ? s.active : ''}
+                onClick={() => togglePanel('background')}
+              >
+                <FileIcon />
+                背景
+              </button>
+              <button
+                className={panel === 'review' ? s.active : ''}
+                onClick={() => togglePanel('review')}
+              >
+                <CalendarDays size={16} />
+                回望
+              </button>
+              <button aria-label="修改历史" title="修改历史" onClick={() => togglePanel('history')}>
+                <History size={17} />
+              </button>
+              <button
+                aria-label="切换深浅主题"
+                title="切换深浅主题"
+                onClick={() =>
+                  void updatePreferences({
+                    theme: preferences.theme === 'glass-light' ? 'glass-dark' : 'glass-light',
+                  })
+                }
+              >
+                {preferences.theme === 'glass-light' ? <Moon size={17} /> : <Sun size={17} />}
+              </button>
+              <button aria-label="设置" title="设置" onClick={() => togglePanel('settings')}>
+                <Settings size={17} />
+              </button>
+              <button className={s.aiButton} onClick={() => togglePanel('ai')}>
+                <Sparkles size={15} />
+                AI 协作
+              </button>
+            </nav>
+          </header>
+          {!workspace ? (
+            <div className={s.loading}>
+              <div className={s.brandMark}>
+                <span />
+              </div>
+              <h2>{bootError ? '暂时无法打开工作台' : '正在为专注腾出空间…'}</h2>
+              <p>{bootError || '连接本机文件服务'}</p>
+              {bootError && <button onClick={() => void refresh()}>重新连接</button>}
             </div>
-            <h2>{bootError ? '暂时无法打开工作台' : '正在为专注腾出空间…'}</h2>
-            <p>{bootError || '连接本机文件服务'}</p>
-            {bootError && <button onClick={() => void refresh()}>重新连接</button>}
-          </div>
-        ) : (
-          <>
-            {snapshot?.readOnly && <div className={s.globalWarning}>{snapshot.readOnly}</div>}
-            {snapshot?.external && (
-              <ExternalNotice snapshot={snapshot} reload={refresh} notify={notify} />
-            )}
-            <ViewLayout
-              className={s.layout}
-              panelWidth={preferences.panelWidth}
-              sidebar={
-                <aside className={s.sidebar}>
-                  <div className={s.sidebarHeading}>
-                    <div>
-                      <h1>
-                        我的任务 <span>{filteredTasks.length}</span>
-                      </h1>
-                    </div>
-                    <button
-                      className={s.roundAdd}
-                      aria-label="新建任务"
-                      title="新建任务"
-                      onClick={() => setNewTask(true)}
-                    >
-                      <Plus size={20} />
-                    </button>
-                  </div>
-                  <label className={s.search}>
-                    <Search size={15} />
-                    <input
-                      aria-label="搜索任务"
-                      placeholder="找一件事情…"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                    {search && (
-                      <button aria-label="清除搜索" onClick={() => setSearch('')}>
-                        <X size={13} />
-                      </button>
-                    )}
-                  </label>
-                  <div className={s.sidebarTabs}>
-                    <span>所有事项</span>
-                    <button onClick={() => togglePanel('organization')}>
-                      <Folder size={13} />
-                      标签管理
-                    </button>
-                  </div>
-                  <div className={s.taskList}>
-                    {filteredTasks.length === 0 ? (
-                      <div className={s.emptyTasks}>
-                        <div className={s.emptyIllustration}>
-                          <div />
-                          <div />
-                          <div />
-                        </div>
-                        <h3>
-                          {workspace.tasks.length ? '当前视图很安静' : '把脑中的事，先放下来'}
-                        </h3>
-                        <p>
-                          {workspace.tasks.length
-                            ? '试试清除筛选或搜索。'
-                            : '从一个小任务开始，\n为今天留出专注的空间。'}
-                        </p>
-                        <button className={s.primary} onClick={() => setNewTask(true)}>
-                          <Plus size={15} />
-                          新建任务
-                        </button>
-                        {!workspace.tasks.length && (
-                          <button className={s.textButton} onClick={() => void loadExample()}>
-                            先体验一组示例
-                          </button>
-                        )}
-                        {!!filterCount && (
-                          <button
-                            onClick={() =>
-                              void updatePreferences({
-                                hiddenTags: [],
-                                hiddenTasks: [],
-                                hiddenStatuses: [],
-                              })
-                            }
-                          >
-                            清除筛选
-                          </button>
-                        )}
+          ) : (
+            <>
+              {snapshot?.readOnly && <div className={s.globalWarning}>{snapshot.readOnly}</div>}
+              {snapshot?.external && (
+                <ExternalNotice snapshot={snapshot} reload={refresh} notify={notify} />
+              )}
+              <ViewLayout
+                className={s.layout}
+                panelWidth={preferences.panelWidth}
+                sidebar={
+                  <aside className={s.sidebar}>
+                    <div className={s.sidebarHeading}>
+                      <div>
+                        <h1>
+                          我的任务 <span>{sidebarHits.length}</span>
+                        </h1>
                       </div>
-                    ) : (
-                      <>{treeOrder(filteredTasks).map(taskRow)}</>
-                    )}
-                  </div>
-                  <div className={s.sidebarFoot}>
-                    <span>拖动任务，安排一个时刻</span>
-                    <button
-                      onClick={() => togglePanel('proposals')}
-                      className={pending ? s.pendingButton : ''}
-                    >
-                      <span className={s.liveDot} />
-                      {pending ? `${pending} 条待确认` : '变更提案'}
-                    </button>
-                  </div>
-                </aside>
-              }
-              divider={
-                <div
-                  className={s.divider}
-                  role="separator"
-                  aria-label="调整任务面板宽度"
-                  aria-orientation="vertical"
-                  tabIndex={0}
-                  onPointerDown={resize}
-                  onKeyDown={(e) => {
-                    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
-                      void updatePreferences({
-                        panelWidth: Math.max(
-                          220,
-                          Math.min(
-                            480,
-                            preferences.panelWidth + (e.key === 'ArrowRight' ? 20 : -20),
-                          ),
-                        ),
-                      });
-                  }}
-                />
-              }
-              board={
-                <section className={s.board}>
-                  <div className={s.boardToolbar}>
-                    <div className={s.dateTitle}>
-                      <h2>
-                        {Number(date.slice(5, 7))}月<span>{date.slice(0, 4)}</span>
-                        <label className={s.datePicker} title="选择起始日期">
-                          <ChevronDown size={17} />
-                          <input
-                            aria-label="看板起始日期"
-                            type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                          />
-                        </label>
-                      </h2>
-                    </div>
-                    <div className={s.dateNavigation}>
                       <button
-                        aria-label="上一组日期"
-                        onClick={() => setDate(addDays(date, -preferences.days))}
+                        className={s.roundAdd}
+                        aria-label="新建任务"
+                        title="新建任务"
+                        onClick={() => setNewTask(true)}
                       >
-                        <ArrowLeft size={16} />
-                      </button>
-                      <button onClick={() => setDate(today())}>今天</button>
-                      <button
-                        aria-label="下一组日期"
-                        onClick={() => setDate(addDays(date, preferences.days))}
-                      >
-                        <ArrowRight size={16} />
+                        <Plus size={20} />
                       </button>
                     </div>
-                  </div>
-                  <div className={s.viewToolbar}>
-                    <div className={s.segmented}>
-                      {([1, 3, 7] as const).map((days) => (
-                        <button
-                          key={days}
-                          className={preferences.days === days ? s.active : ''}
-                          onClick={() => void updatePreferences({ days })}
-                        >
-                          {days === 1 ? '单日' : `${days} 日`}
+                    <label className={s.search}>
+                      <Search size={15} />
+                      <input
+                        aria-label="搜索任务"
+                        placeholder="找一件事情…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                      {search && (
+                        <button aria-label="清除搜索" onClick={() => setSearch('')}>
+                          <X size={13} />
                         </button>
-                      ))}
-                    </div>
-                    <div className={s.viewActions}>
-                      <button
-                        aria-label="切换时间轴方向"
-                        onClick={() =>
-                          void updatePreferences({
-                            orientation:
-                              preferences.orientation === 'vertical' ? 'horizontal' : 'vertical',
-                          })
-                        }
+                      )}
+                    </label>
+                    <div className={s.sidebarTabs}>
+                      <select
+                        aria-label="任务日期筛选"
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value as TaskDateFilter)}
                       >
-                        <Columns3
-                          size={15}
-                          style={{
-                            transform:
-                              preferences.orientation === 'horizontal' ? 'rotate(90deg)' : '',
-                          }}
-                        />
-                        {preferences.orientation === 'vertical' ? '纵向' : '横向'}
-                      </button>
-                      <button
-                        className={filterCount ? s.active : ''}
-                        onClick={() => togglePanel('filters')}
-                      >
-                        <Filter size={14} />
-                        筛选{filterCount > 0 && <span className={s.badge}>{filterCount}</span>}
+                        <option value="all">全部</option>
+                        <option value="today">今天</option>
+                        <option value="week">本周</option>
+                        <option value="next3">未来三天</option>
+                        <option value="next7">未来七天</option>
+                      </select>
+                      <button onClick={() => togglePanel('organization')}>
+                        <Folder size={13} />
+                        标签管理
                       </button>
                     </div>
-                  </div>
-                  <Timeline
-                    tasks={filteredTasks}
-                    dates={dates}
-                    orientation={preferences.orientation}
-                    onSelect={select}
-                    onDrag={start}
-                    preview={drag}
-                    selectedId={selected}
-                    onSchedule={(placement) => {
-                      if (canClick() && snapshot) setSchedule({ placement, base: snapshot });
+                    <div className={s.taskList}>
+                      {sidebarHits.length === 0 ? (
+                        <div className={s.emptyTasks}>
+                          <div className={s.emptyIllustration}>
+                            <div />
+                            <div />
+                            <div />
+                          </div>
+                          <h3>
+                            {workspace.tasks.length ? '当前视图很安静' : '把脑中的事，先放下来'}
+                          </h3>
+                          <p>
+                            {workspace.tasks.length
+                              ? '试试清除筛选或搜索。'
+                              : '从一个小任务开始，\n为今天留出专注的空间。'}
+                          </p>
+                          <button className={s.primary} onClick={() => setNewTask(true)}>
+                            <Plus size={15} />
+                            新建任务
+                          </button>
+                          {!workspace.tasks.length && (
+                            <button className={s.textButton} onClick={() => void loadExample()}>
+                              先体验一组示例
+                            </button>
+                          )}
+                          {!!filterCount && (
+                            <button
+                              onClick={() =>
+                                void updatePreferences({
+                                  hiddenTags: [],
+                                  hiddenTasks: [],
+                                  hiddenStatuses: [],
+                                })
+                              }
+                            >
+                              清除筛选
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <>{treeOrder(sidebarTasks).map(taskRow)}</>
+                      )}
+                    </div>
+                    <div className={s.sidebarFoot}>
+                      <span>拖动任务，安排一个时刻</span>
+                      <button
+                        onClick={() => togglePanel('proposals')}
+                        className={pending ? s.pendingButton : ''}
+                      >
+                        <span className={s.liveDot} />
+                        {pending ? `${pending} 条待确认` : '变更提案'}
+                      </button>
+                    </div>
+                  </aside>
+                }
+                divider={
+                  <div
+                    className={s.divider}
+                    role="separator"
+                    aria-label="调整任务面板宽度"
+                    aria-orientation="vertical"
+                    tabIndex={0}
+                    onPointerDown={resize}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+                        void updatePreferences({
+                          panelWidth: Math.max(
+                            220,
+                            Math.min(
+                              480,
+                              preferences.panelWidth + (e.key === 'ArrowRight' ? 20 : -20),
+                            ),
+                          ),
+                        });
                     }}
                   />
-                </section>
-              }
-              detail={
-                panel && (
-                  <aside className={s.detail}>
-                    <div className={s.detailHeader}>
-                      <span>{panelTitles[panel]}</span>
-                      <button aria-label="收起详情面板" onClick={() => setPanel(undefined)}>
-                        <X size={18} />
-                      </button>
+                }
+                board={
+                  <section className={s.board}>
+                    <div className={s.boardToolbar}>
+                      <div className={s.dateTitle}>
+                        <h2>
+                          {Number(date.slice(5, 7))}月<span>{date.slice(0, 4)}</span>
+                          <label className={s.datePicker} title="选择起始日期">
+                            <ChevronDown size={17} />
+                            <input
+                              aria-label="看板起始日期"
+                              type="date"
+                              value={date}
+                              onChange={(e) => setDate(e.target.value)}
+                            />
+                          </label>
+                        </h2>
+                      </div>
+                      <div className={s.dateNavigation}>
+                        <button
+                          aria-label="上一组日期"
+                          onClick={() => setDate(addDays(date, -preferences.days))}
+                        >
+                          <ArrowLeft size={16} />
+                        </button>
+                        <button onClick={() => setDate(today())}>今天</button>
+                        <button
+                          aria-label="下一组日期"
+                          onClick={() => setDate(addDays(date, preferences.days))}
+                        >
+                          <ArrowRight size={16} />
+                        </button>
+                      </div>
                     </div>
-                    {panel === 'task' &&
-                      (activeTask ? (
-                        <TaskDetail
-                          key={activeTask.id}
-                          task={activeTask}
+                    <div className={s.viewToolbar}>
+                      <div className={s.segmented}>
+                        {([1, 3, 7] as const).map((days) => (
+                          <button
+                            key={days}
+                            className={preferences.days === days ? s.active : ''}
+                            onClick={() => void updatePreferences({ days })}
+                          >
+                            {days === 1 ? '单日' : `${days} 日`}
+                          </button>
+                        ))}
+                      </div>
+                      <div className={s.viewActions}>
+                        <button
+                          aria-label="切换时间轴方向"
+                          onClick={() =>
+                            void updatePreferences({
+                              orientation:
+                                preferences.orientation === 'vertical' ? 'horizontal' : 'vertical',
+                            })
+                          }
+                        >
+                          <Columns3
+                            size={15}
+                            style={{
+                              transform:
+                                preferences.orientation === 'horizontal' ? 'rotate(90deg)' : '',
+                            }}
+                          />
+                          {preferences.orientation === 'vertical' ? '纵向' : '横向'}
+                        </button>
+                        <button
+                          className={filterCount ? s.active : ''}
+                          onClick={() => togglePanel('filters')}
+                        >
+                          <Filter size={14} />
+                          筛选{filterCount > 0 && <span className={s.badge}>{filterCount}</span>}
+                        </button>
+                      </div>
+                    </div>
+                    <Timeline
+                      tasks={filteredTasks}
+                      tags={workspace.tags}
+                      dayStart={preferences.dayStart}
+                      dayEnd={preferences.dayEnd}
+                      dates={dates}
+                      orientation={preferences.orientation}
+                      onSelect={select}
+                      onDrag={start}
+                      preview={drag}
+                      selectedId={selected}
+                      onSchedule={(placement) => {
+                        if (canClick() && snapshot) setSchedule({ placement, base: snapshot });
+                      }}
+                    />
+                  </section>
+                }
+                detail={
+                  panel && (
+                    <aside className={s.detail}>
+                      <div className={s.detailHeader}>
+                        <span>{panelTitles[panel]}</span>
+                        <button aria-label="收起详情面板" onClick={() => setPanel(undefined)}>
+                          <X size={18} />
+                        </button>
+                      </div>
+                      {panel === 'task' &&
+                        (activeTask ? (
+                          <TaskDetail
+                            key={activeTask.id}
+                            task={activeTask}
+                            workspace={workspace}
+                            save={save}
+                            notify={notify}
+                          />
+                        ) : (
+                          <div className={s.panelContent}>选择一个任务，看看它的下一步。</div>
+                        ))}
+                      {panel === 'filters' && (
+                        <FilterPanel
+                          workspace={workspace}
+                          preferences={preferences}
+                          update={(patch) => void updatePreferences(patch)}
+                        />
+                      )}
+                      {panel === 'organization' && (
+                        <OrganizationPanel
                           workspace={workspace}
                           save={save}
+                          refresh={refresh}
                           notify={notify}
                         />
-                      ) : (
-                        <div className={s.panelContent}>选择一个任务，看看它的下一步。</div>
-                      ))}
-                    {panel === 'filters' && (
-                      <FilterPanel
-                        workspace={workspace}
-                        preferences={preferences}
-                        update={(patch) => void updatePreferences(patch)}
-                      />
-                    )}
-                    {panel === 'organization' && (
-                      <OrganizationPanel
-                        workspace={workspace}
-                        save={save}
-                        refresh={refresh}
-                        notify={notify}
-                      />
-                    )}
-                    {panel === 'background' && <BackgroundPanel notify={notify} />}
-                    {panel === 'review' && <ReviewPanel notify={notify} workspace={workspace} />}
-                    {panel === 'history' && <HistoryPanel notify={notify} refresh={refresh} />}
-                    {panel === 'settings' && (
-                      <SettingsPanel notify={notify} onSettings={() => void refresh()} />
-                    )}
-                    {panel === 'proposals' && (
-                      <ProposalsPanel proposals={proposals} refresh={refresh} notify={notify} />
-                    )}
-                    {panel === 'ai' && (
-                      <AiPanel
-                        workspace={workspace}
-                        dates={dates}
-                        notify={notify}
-                        refresh={refresh}
-                        onProposals={() => setPanel('proposals')}
-                      />
-                    )}
-                  </aside>
-                )
+                      )}
+                      {panel === 'background' && <BackgroundPanel notify={notify} />}
+                      {panel === 'review' && <ReviewPanel notify={notify} workspace={workspace} />}
+                      {panel === 'history' && <HistoryPanel notify={notify} refresh={refresh} />}
+                      {panel === 'settings' && (
+                        <SettingsPanel
+                          notify={notify}
+                          onSettings={() => void refresh()}
+                          preferences={preferences}
+                          updatePreferences={updatePreferences}
+                        />
+                      )}
+                      {panel === 'proposals' && (
+                        <ProposalsPanel proposals={proposals} refresh={refresh} notify={notify} />
+                      )}
+                      {panel === 'ai' && (
+                        <AiPanel
+                          workspace={workspace}
+                          dates={dates}
+                          notify={notify}
+                          refresh={refresh}
+                          onProposals={() => setPanel('proposals')}
+                        />
+                      )}
+                    </aside>
+                  )
+                }
+              />
+            </>
+          )}
+          {newTask && workspace && (
+            <NewTaskDialog
+              workspace={workspace}
+              onClose={() => setNewTask(false)}
+              onCreate={async (ops) => {
+                if (await save(ops, '创建任务')) setNewTask(false);
+              }}
+            />
+          )}
+          {schedule && (
+            <ScheduleDialog
+              workspace={schedule.base.data}
+              placement={schedule.placement}
+              onClose={() => setSchedule(undefined)}
+              onSave={(operations, reportError) =>
+                save(operations, '从时间轴添加安排', schedule.base, reportError)
               }
             />
-          </>
-        )}
-        {newTask && workspace && (
-          <NewTaskDialog
-            workspace={workspace}
-            onClose={() => setNewTask(false)}
-            onCreate={async (ops) => {
-              if (await save(ops, '创建任务')) setNewTask(false);
-            }}
-          />
-        )}
-        {schedule && (
-          <ScheduleDialog
-            workspace={schedule.base.data}
-            placement={schedule.placement}
-            onClose={() => setSchedule(undefined)}
-            onSave={(operations, reportError) =>
-              save(operations, '从时间轴添加安排', schedule.base, reportError)
-            }
-          />
-        )}
-        {toast && (
-          <div role="status" className={`${s.toast} ${toast.error ? s.errorToast : ''}`}>
-            {toast.error ? <Circle size={17} /> : <Check size={17} />}
-            <span>{toast.message}</span>
-            <button aria-label="关闭提示" onClick={() => setToast(undefined)}>
-              <X size={15} />
-            </button>
-          </div>
-        )}
-      </div>
+          )}
+          {tagConfirmation && (
+            <TagPropagationDialog
+              request={tagConfirmation}
+              onAnswer={(answer) => {
+                tagConfirmation.resolve(answer);
+                setTagConfirmation(undefined);
+              }}
+            />
+          )}
+          {toast && (
+            <div role="status" className={`${s.toast} ${toast.error ? s.errorToast : ''}`}>
+              {toast.error ? <Circle size={17} /> : <Check size={17} />}
+              <span>{toast.message}</span>
+              <button aria-label="关闭提示" onClick={() => setToast(undefined)}>
+                <X size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      </InheritTagsContext.Provider>
     </ThemeContext.Provider>
   );
 }

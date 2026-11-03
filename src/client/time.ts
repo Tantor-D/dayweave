@@ -45,7 +45,7 @@ export interface Segment {
   first: boolean;
   last: boolean;
 }
-export function segmentsFor(tasks: Task[], date: string): Segment[] {
+export function segmentsFor(tasks: Task[], date: string, dayStart = 0, dayEnd = 1440): Segment[] {
   const startOfDay = Date.parse(atMinute(date, 0));
   const result: Segment[] = [];
   for (const task of tasks)
@@ -53,15 +53,15 @@ export function segmentsFor(tasks: Task[], date: string): Segment[] {
       if (placement.kind !== 'timed') continue;
       const start = (Date.parse(placement.startAt) - startOfDay) / 60000;
       const end = (Date.parse(placement.endAt) - startOfDay) / 60000;
-      if (start >= 1440 || end <= 0) continue;
+      if (start >= dayEnd || end <= dayStart) continue;
       result.push({
         task,
         placement,
         date,
-        start: Math.max(0, start),
-        end: Math.min(1440, end),
-        first: start >= 0,
-        last: end <= 1440,
+        start: Math.max(dayStart, start),
+        end: Math.min(dayEnd, end),
+        first: start >= dayStart,
+        last: end <= dayEnd,
         lane: 0,
         lanes: 1,
       });
@@ -112,5 +112,49 @@ export function selectedRange(
     kind: 'timed',
     startAt: new Date(Math.min(a, b)).toISOString(),
     endAt: new Date(Math.max(a, b) + (a === b ? 15 * 60000 : 0)).toISOString(),
+  };
+}
+
+export type TaskDateFilter = 'all' | 'today' | 'week' | 'next3' | 'next7';
+export function filterDates(filter: TaskDateFilter, base = today()): string[] {
+  if (filter === 'all') return [];
+  if (filter === 'week') {
+    const day = new Date(base + 'T12:00:00+08:00').getUTCDay();
+    return datesFrom(addDays(base, -((day + 6) % 7)), 7);
+  }
+  return datesFrom(base, filter === 'next3' ? 3 : filter === 'next7' ? 7 : 1);
+}
+export const minuteLabel = (minute: number) =>
+  String(Math.floor(minute / 60)).padStart(2, '0') + ':' + String(minute % 60).padStart(2, '0');
+export function parseClock(value: string): number {
+  if (value === '24:00') return 1440;
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return NaN;
+  const [h, m] = value.split(':').map(Number);
+  return h * 60 + m;
+}
+export function windowMinute(
+  fraction: number,
+  start: number,
+  end: number,
+  allowEnd = false,
+): number {
+  const raw = Math.round((start + Math.max(0, Math.min(1, fraction)) * (end - start)) / 15) * 15;
+  return Math.max(
+    start,
+    Math.min(allowEnd ? end : Math.max(start, end - Math.min(15, end - start)), raw),
+  );
+}
+export function placementInWindow(
+  date: string,
+  fraction: number,
+  start: number,
+  end: number,
+): Placement {
+  const minute = windowMinute(fraction, start, end);
+  return {
+    id: crypto.randomUUID(),
+    kind: 'timed',
+    startAt: atMinute(date, minute),
+    endAt: atMinute(date, Math.min(end, minute + 60)),
   };
 }

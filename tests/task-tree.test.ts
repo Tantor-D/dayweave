@@ -71,7 +71,7 @@ test('completion propagates down and up arbitrary task depth, reopening/new chil
   ).workspace;
   assert.deepEqual(
     w.tasks.map((t) => t.status),
-    ['in_progress', 'in_progress', 'todo', 'done'],
+    ['todo', 'todo', 'todo', 'done'],
   );
   const completedAgain = applyOperations(
     w,
@@ -86,7 +86,7 @@ test('completion propagates down and up arbitrary task depth, reopening/new chil
   ).workspace;
   assert.deepEqual(
     w.tasks.map((t) => t.status),
-    ['in_progress', 'in_progress', 'done', 'done', 'todo'],
+    ['todo', 'todo', 'done', 'done', 'todo'],
   );
   assert.equal(taskPath(w.tasks[4], w.tasks), 'A / B / E');
   assert.deepEqual(
@@ -115,7 +115,7 @@ test('moving unfinished children reopens completed parents; tags are flat, uniqu
     { type: 'tag.create', id: 'custom', name: '工作' },
     { type: 'task.update', id: 'b', patch: { tagIds: ['P0', 'P4', 'custom'] } },
   ]).workspace;
-  assert.equal(w.tasks[0].status, 'in_progress');
+  assert.equal(w.tasks[0].status, 'todo');
   assert.deepEqual(w.tasks[1].tagIds, ['P0', 'P4', 'custom']);
   for (const name of ['a/b', '/', '   ', '工作'])
     assert.throws(() => applyOperations(w, [{ type: 'tag.create', name }]));
@@ -185,7 +185,7 @@ test('startup backs up and commits migration, maps preferences, invalidates prop
   });
   let snap = await store.read('workspace');
   const w = snap.data as Workspace;
-  assert.equal(w.schemaVersion, 2);
+  assert.equal(w.schemaVersion, 3);
   assert.equal(w.revision, 5);
   assert.equal(snap.readOnly, undefined);
   const history = await store.history('workspace');
@@ -207,7 +207,7 @@ test('startup backs up and commits migration, maps preferences, invalidates prop
   await store.close();
   store = await Store.open(options);
   snap = await store.read('workspace');
-  assert.equal((snap.data as Workspace).schemaVersion, 2);
+  assert.equal((snap.data as Workspace).schemaVersion, 3);
   assert.equal((snap.data as Workspace).revision, 6);
   assert.equal(snap.readOnly, undefined);
 });
@@ -230,7 +230,7 @@ test('migration interrupted after replacement recovers through the existing tran
     await rm(root, { recursive: true, force: true });
   });
   const snap = await store.read('workspace');
-  assert.equal((snap.data as Workspace).schemaVersion, 2);
+  assert.equal((snap.data as Workspace).schemaVersion, 3);
   assert.equal(snap.readOnly, undefined);
   assert.equal((await store.history())[0].status, 'committed');
 });
