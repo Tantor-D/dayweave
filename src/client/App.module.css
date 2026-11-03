@@ -394,13 +394,6 @@
   color: var(--muted);
   margin-top: 6px;
 }
-.priorityDot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--priority);
-  display: inline-block;
-}
 .taskGrip {
   color: var(--muted);
   opacity: 0;
@@ -750,8 +743,8 @@
 }
 .dayChip {
   border-radius: 5px;
-  color: var(--priority);
-  background: color-mix(in srgb, var(--priority), transparent 90%);
+  color: var(--task-color);
+  background: color-mix(in srgb, var(--task-color), transparent 90%);
   font-size: 10px;
   padding: 4px 7px;
   display: flex;
@@ -759,7 +752,7 @@
   gap: 3px;
   cursor: grab;
   touch-action: none;
-  border-left: 2px solid var(--priority);
+  border-left: 2px solid var(--task-color);
 }
 .timeBody {
   height: var(--time-size);
@@ -800,10 +793,10 @@
 }
 .timeBlock {
   position: absolute;
-  border: 1px solid color-mix(in srgb, var(--priority), transparent 66%);
-  border-left: 3px solid var(--priority);
+  border: 1px solid color-mix(in srgb, var(--task-color), transparent 66%);
+  border-left: 3px solid var(--task-color);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--priority), var(--solid) 90%);
+  background: color-mix(in srgb, var(--task-color), var(--solid) 90%);
   color: var(--text);
   padding: 8px 8px 5px;
   overflow: hidden;
@@ -821,12 +814,12 @@
   z-index: 3;
 }
 .timeBlock.selected {
-  outline: 1px solid var(--priority);
+  outline: 1px solid var(--task-color);
   outline-offset: 1px;
 }
 .timeBlock.dragging {
   opacity: 0.65;
-  outline: 2px dashed var(--priority);
+  outline: 2px dashed var(--task-color);
 }
 .blockTitle {
   display: flex;
@@ -851,7 +844,7 @@
 }
 .timeBlock small {
   font-size: 8px;
-  color: var(--priority);
+  color: var(--task-color);
   margin-top: 5px;
   display: block;
 }
@@ -866,7 +859,7 @@
 .resizeHandle:after {
   content: '';
   display: block;
-  background: var(--priority);
+  background: var(--task-color);
   height: 2px;
   width: 16px;
   border-radius: 3px;
@@ -884,17 +877,8 @@
 .endHandle {
   bottom: 0;
 }
-.P0 {
-  --priority: var(--p0);
-}
-.P1 {
-  --priority: var(--p1);
-}
-.P2 {
-  --priority: var(--p2);
-}
-.P3 {
-  --priority: var(--p3);
+.taskColor {
+  --task-color: var(--accent);
 }
 .nowLine {
   position: absolute;
@@ -1838,4 +1822,40 @@
     backdrop-filter: none;
     background: var(--solid);
   }
+}
+
+.tagPicker {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.tagPicker label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+.tagPicker input {
+  width: auto;
+}
+.rangeSelection {
+  position: absolute;
+  pointer-events: none;
+  z-index: 8;
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  padding: 3px;
+  overflow: hidden;
+}
+.timeCell {
+  touch-action: none;
 }

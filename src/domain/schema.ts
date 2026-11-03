@@ -15,17 +15,15 @@ export const placementSchema = z.discriminatedUnion('kind', [
   z.strictObject({ id: idSchema, kind: z.literal('day'), date: dateSchema }),
   z.strictObject({ id: idSchema, kind: z.literal('timed'), startAt: instant, endAt: instant }),
 ]);
-export const categorySchema = z.strictObject({
+export const tagNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1000)
+  .regex(/^[^/]+$/, '标签不能包含 /');
+export const tagSchema = z.strictObject({
   id: idSchema,
-  name: title,
-  order: z.number().finite(),
-  archivedAt,
-});
-export const projectSchema = z.strictObject({
-  id: idSchema,
-  title,
-  description: z.string().max(100000),
-  categoryId: idSchema,
+  name: tagNameSchema,
   order: z.number().finite(),
   archivedAt,
 });
@@ -34,9 +32,8 @@ export const taskSchema = z.strictObject({
   title,
   description: z.string().max(100000),
   status: z.enum(['todo', 'in_progress', 'done']),
-  priority: z.enum(['P0', 'P1', 'P2', 'P3']),
-  projectId: idSchema.nullable(),
-  categoryId: idSchema.nullable(),
+  parentId: idSchema.nullable(),
+  tagIds: z.array(idSchema),
   order: z.number().finite(),
   createdAt: instant,
   updatedAt: instant,
@@ -45,40 +42,26 @@ export const taskSchema = z.strictObject({
   placements: z.array(placementSchema),
 });
 export const workspaceSchema = z.strictObject({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   revision: z.number().int().nonnegative(),
   timezone: z.literal('Asia/Shanghai'),
-  categories: z.array(categorySchema),
-  projects: z.array(projectSchema),
+  tags: z.array(tagSchema),
   tasks: z.array(taskSchema),
 });
 export const operationSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('category.create'), id: idSchema.optional(), name: title }),
+  z.strictObject({ type: z.literal('tag.create'), id: idSchema.optional(), name: tagNameSchema }),
   z.strictObject({
-    type: z.literal('category.update'),
+    type: z.literal('tag.update'),
     id: idSchema,
-    patch: categorySchema.pick({ name: true, order: true, archivedAt: true }).partial(),
-  }),
-  z.strictObject({
-    type: z.literal('project.create'),
-    id: idSchema.optional(),
-    title,
-    categoryId: idSchema,
-    description: z.string().max(100000).optional(),
-  }),
-  z.strictObject({
-    type: z.literal('project.update'),
-    id: idSchema,
-    patch: projectSchema.omit({ id: true }).partial(),
+    patch: tagSchema.pick({ name: true, order: true, archivedAt: true }).partial(),
   }),
   z.strictObject({
     type: z.literal('task.create'),
     id: idSchema.optional(),
     title,
     description: z.string().max(100000).optional(),
-    categoryId: idSchema.nullable().optional(),
-    projectId: idSchema.nullable().optional(),
-    priority: z.enum(['P0', 'P1', 'P2', 'P3']).optional(),
+    parentId: idSchema.nullable().optional(),
+    tagIds: z.array(idSchema).optional(),
   }),
   z.strictObject({
     type: z.literal('task.update'),
@@ -88,9 +71,8 @@ export const operationSchema = z.discriminatedUnion('type', [
         title: true,
         description: true,
         status: true,
-        priority: true,
-        categoryId: true,
-        projectId: true,
+        parentId: true,
+        tagIds: true,
         order: true,
         archivedAt: true,
       })
@@ -120,8 +102,7 @@ export const preferencesSchema = z.strictObject({
   days: z.union([z.literal(1), z.literal(3), z.literal(7)]),
   orientation: z.enum(['vertical', 'horizontal']),
   panelWidth: z.number().min(200).max(700),
-  hiddenCategories: z.array(idSchema),
-  hiddenProjects: z.array(idSchema),
+  hiddenTags: z.array(idSchema),
   hiddenTasks: z.array(idSchema),
   hiddenStatuses: z.array(z.enum(['todo', 'in_progress', 'done'])),
   showArchived: z.boolean(),

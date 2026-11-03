@@ -1,3 +1,5 @@
+import { TaskFields } from './TaskFields';
+import { taskPath } from '../domain/tree';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowDown,
@@ -32,7 +34,6 @@ import { api, commit, readDocument } from './api';
 import { clockLabel, localInput, localToUTC, today, taskOnDay } from './time';
 import s from './App.module.css';
 export const statusLabels = { todo: '待办', in_progress: '进行中', done: '已完成' };
-export const priorityLabels = { P0: 'P0 · 紧急', P1: 'P1 · 高', P2: 'P2 · 普通', P3: 'P3 · 低' };
 export type Save = (operations: Operation[], summary: string) => Promise<boolean>;
 export type Notify = (message: string, error?: boolean) => void;
 export interface PanelProps {
@@ -68,9 +69,8 @@ export function TaskDetail({
               title: draft.title,
               description: draft.description,
               status: draft.status,
-              priority: draft.priority,
-              projectId: draft.projectId,
-              categoryId: draft.projectId ? null : draft.categoryId,
+              parentId: draft.parentId,
+              tagIds: draft.tagIds,
             },
           },
         ],
@@ -84,89 +84,24 @@ export function TaskDetail({
     <div className={s.panelContent}>
       <h2>为当下留一点空间</h2>
       <form onSubmit={submit} className={s.form}>
+        <TaskFields
+          workspace={workspace}
+          draft={draft}
+          taskId={task.id}
+          onChange={(fields) => setDraft({ ...draft, ...fields })}
+        />
         <label>
-          任务名称
-          <input
-            aria-label="任务名称"
-            required
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-          />
-        </label>
-        <div className={s.formRow}>
-          <label>
-            状态
-            <select
-              value={draft.status}
-              onChange={(e) => setDraft({ ...draft, status: e.target.value as Task['status'] })}
-            >
-              {Object.entries(statusLabels).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            优先级
-            <select
-              value={draft.priority}
-              onChange={(e) => setDraft({ ...draft, priority: e.target.value as Task['priority'] })}
-            >
-              {Object.entries(priorityLabels).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label>
-          归属项目
+          状态
           <select
-            value={draft.projectId ?? ''}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                projectId: e.target.value || null,
-                categoryId: e.target.value
-                  ? null
-                  : (workspace.categories.find((c) => !c.archivedAt)?.id ?? null),
-              })
-            }
+            value={draft.status}
+            onChange={(e) => setDraft({ ...draft, status: e.target.value as Task['status'] })}
           >
-            <option value="">独立任务</option>
-            {workspace.projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title}
-                {p.archivedAt ? '（已归档）' : ''}
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </select>
-        </label>
-        {!draft.projectId && (
-          <label>
-            分类
-            <select
-              value={draft.categoryId ?? ''}
-              onChange={(e) => setDraft({ ...draft, categoryId: e.target.value })}
-            >
-              {workspace.categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label>
-          说明
-          <textarea
-            rows={5}
-            placeholder="写下下一步、参考资料，或一点提醒…"
-            value={draft.description}
-            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-          />
         </label>
         <button className={s.primary} disabled={busy}>
           {busy ? <LoaderCircle className={s.spin} size={15} /> : <Check size={15} />}保存详情
@@ -227,7 +162,10 @@ export function TaskDetail({
         </button>
       </div>
       <p className={s.hint}>
-        创建于 {new Date(task.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+        {task.createdAt === '1970-01-01T00:00:00.000Z'
+          ? '创建时间未知（旧数据）'
+          : '创建于 ' +
+            new Date(task.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
       </p>
     </div>
   );
@@ -378,10 +316,7 @@ export function FilterPanel({
   preferences: Preferences;
   update: (patch: Partial<Preferences>) => void;
 }) {
-  const toggle = (
-    key: 'hiddenCategories' | 'hiddenProjects' | 'hiddenTasks' | 'hiddenStatuses',
-    id: string,
-  ) =>
+  const toggle = (key: 'hiddenTags' | 'hiddenTasks' | 'hiddenStatuses', id: string) =>
     update({
       [key]: (preferences[key] as string[]).includes(id)
         ? (preferences[key] as string[]).filter((v) => v !== id)
@@ -394,8 +329,7 @@ export function FilterPanel({
       <button
         onClick={() =>
           update({
-            hiddenCategories: [],
-            hiddenProjects: [],
+            hiddenTags: [],
             hiddenTasks: [],
             hiddenStatuses: [],
             showArchived: false,
@@ -407,13 +341,12 @@ export function FilterPanel({
       </button>
       {(
         [
+          ['标签', 'hiddenTags', workspace.tags.map((x) => ({ id: x.id, title: x.name }))],
           [
-            '分类',
-            'hiddenCategories',
-            workspace.categories.map((x) => ({ id: x.id, title: x.name })),
+            '任务',
+            'hiddenTasks',
+            workspace.tasks.map((t) => ({ id: t.id, title: taskPath(t, workspace.tasks) })),
           ],
-          ['项目', 'hiddenProjects', workspace.projects],
-          ['任务', 'hiddenTasks', workspace.tasks],
           [
             '状态',
             'hiddenStatuses',
@@ -447,180 +380,76 @@ export function FilterPanel({
   );
 }
 export function OrganizationPanel({ workspace, save }: PanelProps) {
-  const [kind, setKind] = useState<'project' | 'category'>('project'),
-    [name, setName] = useState(''),
-    [category, setCategory] = useState(workspace.categories.find((c) => !c.archivedAt)?.id ?? '');
-  const create = async (e: FormEvent) => {
-    e.preventDefault();
-    const saved = await save(
-      [
-        kind === 'category'
-          ? { type: 'category.create', name }
-          : { type: 'project.create', title: name, categoryId: category },
-      ],
-      '新增' + (kind === 'category' ? '分类' : '项目'),
-    );
-    if (saved) setName('');
-  };
+  const [name, setName] = useState('');
   return (
     <div className={s.panelContent}>
-      <h2>项目与分类</h2>
-      <form className={s.form} onSubmit={(e) => void create(e)}>
-        <div className={s.segmented}>
-          <button
-            type="button"
-            className={kind === 'project' ? s.active : ''}
-            onClick={() => setKind('project')}
-          >
-            新建项目
-          </button>
-          <button
-            type="button"
-            className={kind === 'category' ? s.active : ''}
-            onClick={() => setKind('category')}
-          >
-            新建分类
-          </button>
-        </div>
+      <h2>标签管理</h2>
+      <p className={s.hint}>标签可多选，不分层级；名称不能包含 /。</p>
+      <form
+        className={s.form}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (await save([{ type: 'tag.create', name: name.trim() }], '创建标签')) setName('');
+        }}
+      >
         <label>
-          名称
+          标签名称
           <input
+            aria-label="新标签名称"
             required
-            aria-label="新建项目或分类名称"
+            pattern={'[^\\/]+'}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={kind === 'project' ? '例如：秋季产品发布' : '例如：学习'}
           />
         </label>
-        {kind === 'project' && (
-          <label>
-            所属分类
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              {workspace.categories
-                .filter((c) => !c.archivedAt)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-        )}
-        <button className={s.primary}>
-          <Plus size={14} />
-          创建{kind === 'project' ? '项目' : '分类'}
-        </button>
+        <button className={s.primary}>创建标签</button>
       </form>
-      <h3>项目</h3>
-      {workspace.projects
-        .slice()
-        .sort((a, b) => a.order - b.order)
-        .map((p) => (
-          <EntityEditor key={p.id} item={p} kind="project" workspace={workspace} save={save} />
-        ))}
-      <h3>分类</h3>
-      {workspace.categories
-        .slice()
-        .sort((a, b) => a.order - b.order)
-        .map((c) => (
-          <EntityEditor
-            key={c.id}
-            item={{ ...c, title: c.name }}
-            kind="category"
-            workspace={workspace}
-            save={save}
-          />
-        ))}
-      <p className={s.hint}>
-        归档分类前，先将仍属于它的任务和项目移到其他分类。归档保留数据，可随时恢复。
-      </p>
+      {workspace.tags.map((tag) => (
+        <TagEditor key={tag.id + tag.name} tag={tag} save={save} />
+      ))}
     </div>
   );
 }
-function EntityEditor({
-  item,
-  kind,
-  workspace,
-  save,
-}: {
-  item: {
-    id: string;
-    title: string;
-    order: number;
-    archivedAt: string | null;
-    categoryId?: string;
-    description?: string;
-  };
-  kind: 'project' | 'category';
-  workspace: Workspace;
-  save: Save;
-}) {
-  const [title, setTitle] = useState(item.title),
-    [description, setDescription] = useState(item.description ?? ''),
-    [categoryId, setCategoryId] = useState(item.categoryId ?? ''),
-    [open, setOpen] = useState(false);
-  const update = (patch: Record<string, unknown>) =>
-    void save(
-      [{ type: `${kind}.update`, id: item.id, patch } as Operation],
-      `更新${kind === 'project' ? '项目' : '分类'}`,
-    );
+function TagEditor({ tag, save }: { tag: Workspace['tags'][number]; save: Save }) {
+  const [name, setName] = useState(tag.name);
   return (
-    <div className={s.entity}>
-      <div className={s.entityHeading}>
-        <button onClick={() => setOpen(!open)}>
-          {item.title}
-          {item.archivedAt && <small> 已归档</small>}
-          <ChevronDown size={13} />
-        </button>
+    <form
+      className={s.form}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save([{ type: 'tag.update', id: tag.id, patch: { name: name.trim() } }], '更新标签');
+      }}
+    >
+      <label>
+        标签名称
+        <input
+          required
+          pattern={'[^\\/]+'}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </label>
+      <div className={s.buttonRow}>
+        <button>保存标签</button>
         <button
-          title={item.archivedAt ? '恢复' : '归档'}
-          onClick={() => update({ archivedAt: item.archivedAt ? null : new Date().toISOString() })}
+          type="button"
+          onClick={() =>
+            void save(
+              [
+                {
+                  type: 'tag.update',
+                  id: tag.id,
+                  patch: { archivedAt: tag.archivedAt ? null : new Date().toISOString() },
+                },
+              ],
+              '更改标签归档状态',
+            )
+          }
         >
-          <Archive size={14} />
+          {tag.archivedAt ? '恢复标签' : '归档标签'}
         </button>
       </div>
-      {open && (
-        <form
-          className={s.form}
-          onSubmit={(e) => {
-            e.preventDefault();
-            update(kind === 'project' ? { title, description, categoryId } : { name: title });
-          }}
-        >
-          <label>
-            名称
-            <input required value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          {kind === 'project' && (
-            <>
-              <label>
-                分类
-                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                  {workspace.categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                说明
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-              </label>
-            </>
-          )}
-          <div className={s.buttonRow}>
-            <button className={s.primary}>保存</button>
-            <button type="button" title="上移" onClick={() => update({ order: item.order - 1.5 })}>
-              <ArrowUp size={14} />
-            </button>
-            <button type="button" title="下移" onClick={() => update({ order: item.order + 1.5 })}>
-              <ArrowDown size={14} />
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
+    </form>
   );
 }
 export function DocumentEditor({
@@ -997,7 +826,7 @@ export function HistoryPanel({
     <div className={s.panelContent}>
       <h2>修改历史</h2>
       <p className={s.hint}>
-        恢复工作数据会影响整个任务、项目和排期快照；恢复文档只影响该文档。恢复会保留旧历史。
+        恢复工作数据会影响整个任务树、标签和排期快照；恢复文档只影响该文档。恢复会保留旧历史。
       </p>
       <select
         aria-label="历史目标"

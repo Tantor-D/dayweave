@@ -1,3 +1,5 @@
+import { migrateWorkspace } from './migration.ts';
+import { ancestors, treeOrder } from './tree.ts';
 import { randomUUID } from 'node:crypto';
 import { operationSchema, workspaceSchema } from './schema.ts';
 import type { Change, Operation, Workspace } from './types.ts';
@@ -24,45 +26,39 @@ export function validDate(value: string): boolean {
 }
 export function emptyWorkspace(): Workspace {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: 0,
     timezone: 'Asia/Shanghai',
-    categories: [
-      { id: 'work', name: '工作', order: 0, archivedAt: null },
-      { id: 'personal', name: '个人', order: 1, archivedAt: null },
-    ],
-    projects: [],
+    tags: ['P0', 'P1', 'P2', 'P3', 'P4'].map((name, order) => ({
+      id: name,
+      name,
+      order,
+      archivedAt: null,
+    })),
     tasks: [],
   };
 }
 export function validateWorkspace(value: unknown): Workspace {
+  if (value && typeof value === 'object' && 'schemaVersion' in value && value.schemaVersion === 1)
+    value = migrateWorkspace(value);
   const parsed = workspaceSchema.safeParse(value);
   if (!parsed.success)
     fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   const w = parsed.data! as Workspace;
-  for (const items of [w.categories, w.projects, w.tasks]) {
+  for (const items of [w.tags, w.tasks]) {
     if (new Set(items.map((i) => i.id)).size !== items.length) fail('集合中存在重复 ID');
   }
-  const categories = new Map(w.categories.map((c) => [c.id, c]));
-  const projects = new Map(w.projects.map((p) => [p.id, p]));
-  for (const p of w.projects) {
-    const c = categories.get(p.categoryId);
-    if (!c) fail(`项目 ${p.id} 的分类不存在`);
-    if (c!.archivedAt) fail('分类仍被项目使用，须先迁移归属才能归档');
-    if (!p.title.trim()) fail('项目名称不能为空');
-  }
-  for (const c of w.categories) if (!c.name.trim()) fail('分类名称不能为空');
+  if (new Set(w.tags.map((t) => t.name)).size !== w.tags.length) fail('标签名称重复');
+  validateTree(w);
+  const tags = new Set(w.tags.map((t) => t.id));
   const placementIds = new Set<string>();
   for (const t of w.tasks) {
     if (!t.title.trim()) fail('任务名称不能为空');
-    if (t.projectId) {
-      if (!projects.has(t.projectId)) fail(`任务 ${t.id} 的项目不存在`);
-      if (t.categoryId !== null) fail('项目任务不能同时保存独立分类');
-    } else {
-      const c = categories.get(t.categoryId ?? '');
-      if (!c) fail(`任务 ${t.id} 的分类不存在`);
-      if (c!.archivedAt) fail('分类仍被独立任务使用，须先迁移归属才能归档');
-    }
+    if (new Set(t.tagIds).size !== t.tagIds.length || t.tagIds.some((id) => !tags.has(id)))
+      fail('任务标签重复或不存在');
+    const children = w.tasks.filter((c) => c.parentId === t.id);
+    if (children.length && (t.status === 'done') !== children.every((c) => c.status === 'done'))
+      fail('父子任务完成状态不一致');
     if ((t.status === 'done') !== (t.completedAt !== null)) fail('完成状态与完成时间不一致');
     const dates = new Set<string>();
     for (const p of t.placements) {
@@ -79,7 +75,7 @@ export function validateWorkspace(value: unknown): Workspace {
 }
 export function normalizeWorkspace(w: Workspace): Workspace {
   const result = structuredClone(w);
-  for (const item of [...result.categories, ...result.projects])
+  for (const item of result.tags)
     if (item.archivedAt) item.archivedAt = new Date(item.archivedAt).toISOString();
   for (const task of result.tasks) {
     task.createdAt = new Date(task.createdAt).toISOString();
@@ -107,29 +103,16 @@ export function applyOperations(
     if (!result.success) fail(result.error.message);
     const op = result.data! as Operation;
     switch (op.type) {
-      case 'category.create':
-        w.categories.push({
+      case 'tag.create':
+        w.tags.push({
           id: op.id ?? randomUUID(),
           name: op.name,
-          order: w.categories.length,
+          order: w.tags.length,
           archivedAt: null,
         });
         break;
-      case 'category.update':
-        Object.assign(w.categories.find((c) => c.id === op.id) ?? fail('分类不存在'), op.patch);
-        break;
-      case 'project.create':
-        w.projects.push({
-          id: op.id ?? randomUUID(),
-          title: op.title,
-          categoryId: op.categoryId,
-          description: op.description ?? '',
-          order: w.projects.length,
-          archivedAt: null,
-        });
-        break;
-      case 'project.update':
-        Object.assign(w.projects.find((p) => p.id === op.id) ?? fail('项目不存在'), op.patch);
+      case 'tag.update':
+        Object.assign(w.tags.find((t) => t.id === op.id) ?? fail('标签不存在'), op.patch);
         break;
       case 'task.create': {
         w.tasks.push({
@@ -137,13 +120,8 @@ export function applyOperations(
           title: op.title,
           description: op.description ?? '',
           status: 'todo',
-          priority: op.priority ?? 'P2',
-          projectId: op.projectId ?? null,
-          categoryId: op.projectId
-            ? null
-            : (op.categoryId ??
-              w.categories.find((c) => !c.archivedAt)?.id ??
-              fail('请先创建分类')),
+          parentId: op.parentId ?? null,
+          tagIds: op.tagIds ?? [],
           order: w.tasks.length,
           createdAt: now,
           updatedAt: now,
@@ -156,17 +134,26 @@ export function applyOperations(
       case 'task.update': {
         const t = task(op.id);
         const previousStatus = t.status;
-        const oldProject = t.projectId;
         Object.assign(t, op.patch);
-        if (t.projectId) t.categoryId = null;
-        else if (oldProject && op.patch.categoryId === undefined)
-          t.categoryId = w.projects.find((p) => p.id === oldProject)?.categoryId ?? null;
-        if (t.status !== previousStatus) {
-          t.completedAt = t.status === 'done' ? now : null;
-          if (t.status === 'done')
-            completionEvents.push({ taskId: t.id, title: t.title, completedAt: now });
-        }
+        if (previousStatus !== t.status) t.completedAt = t.status === 'done' ? now : null;
         t.updatedAt = now;
+        validateTree(w);
+        if (op.patch.status === 'done') {
+          for (const child of w.tasks)
+            if (ancestors(child, w.tasks).some((a) => a.id === t.id)) {
+              if (child.status !== 'done') child.completedAt = now;
+              child.status = 'done';
+              child.updatedAt = now;
+            }
+        } else if (
+          op.patch.status &&
+          w.tasks.some((child) => child.parentId === t.id) &&
+          w.tasks
+            .filter((child) => child.parentId === t.id)
+            .every((child) => child.status === 'done')
+        ) {
+          fail('请先重新打开一个子任务，父任务会自动变为进行中');
+        }
         break;
       }
       case 'placement.put': {
@@ -199,7 +186,23 @@ export function applyOperations(
       case 'text.write':
         fail('工作区提案不能包含文本操作');
     }
+    validateTree(w);
+    for (const parent of treeOrder(w.tasks).reverse()) {
+      const children = w.tasks.filter((t) => t.parentId === parent.id);
+      if (!children.length) continue;
+      const done = children.every((t) => t.status === 'done');
+      if (done && parent.status !== 'done') {
+        parent.status = 'done';
+        parent.completedAt = now;
+        parent.updatedAt = now;
+      } else if (!done && parent.status === 'done') {
+        parent.status = 'in_progress';
+        parent.completedAt = null;
+        parent.updatedAt = now;
+      }
+    }
   }
+  completionEvents.push(...completionChanges(before, w));
   return { workspace: normalizeWorkspace(validateWorkspace(w)), completionEvents };
 }
 export function completionChanges(before: Workspace, after: Workspace): Change['completionEvents'] {
@@ -207,4 +210,19 @@ export function completionChanges(before: Workspace, after: Workspace): Change['
   return after.tasks
     .filter((t) => t.status === 'done' && old.get(t.id)?.status !== 'done' && t.completedAt)
     .map((t) => ({ taskId: t.id, title: t.title, completedAt: t.completedAt! }));
+}
+
+function validateTree(w: Workspace): void {
+  const tasks = new Map(w.tasks.map((t) => [t.id, t]));
+  for (const t of w.tasks) {
+    const seen = new Set([t.id]);
+    let id = t.parentId;
+    while (id) {
+      if (seen.has(id)) fail('任务不能属于自己或自己的后代');
+      seen.add(id);
+      const parent = tasks.get(id);
+      if (!parent) fail('父任务不存在');
+      id = parent!.parentId;
+    }
+  }
 }

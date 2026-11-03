@@ -108,7 +108,7 @@ test('web manual edits, AI confirmation, policy changes and stale proposals shar
         target: 'workspace',
         baseHash: snap.hash,
         baseRevision: snap.revision,
-        operations: [{ type: 'task.create', title, categoryId: snap.data.categories[0].id }],
+        operations: [{ type: 'task.create', title, tagIds: [snap.data.tags[0].id] }],
       },
     });
     assert.equal(res.statusCode, 200, res.body);
@@ -195,7 +195,7 @@ test('review uses completion events even after reopening and restoration does no
           type: 'task.create',
           id: 'review-task',
           title: 'Review',
-          categoryId: (snap.data as { categories: { id: string }[] }).categories[0].id,
+          tagIds: [(snap.data as { tags: { id: string }[] }).tags[0].id],
         },
       ],
     },
@@ -274,9 +274,7 @@ test('harness CLI uses the running service, parses stdin and returns a pending p
     target: 'workspace',
     baseHash: snap.hash,
     baseRevision: snap.revision,
-    operations: [
-      { type: 'task.create', title: 'CLI task', categoryId: snap.data.categories[0].id },
-    ],
+    operations: [{ type: 'task.create', title: 'CLI task', tagIds: [snap.data.tags[0].id] }],
   });
   assert.equal(preview.code, 0, preview.stderr);
   const proposal = JSON.parse(preview.stdout);

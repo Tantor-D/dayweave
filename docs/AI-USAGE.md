@@ -2,7 +2,7 @@
 
 ## 文档的关键结论
 
-`v0.1.0 / focus-workbench` 的网页 AI 与外部 harness 操作同一份本地数据，并共用校验、审批、版本冲突和历史恢复。默认 AI 写入需要网页确认；自动接受只省略人工确认，仍保存历史。真实模型需用户配置，自动测试使用模拟 HTTP 接口，不代表真实供应商连接已验证。
+`v0.2.0 / focus-workbench` 的网页 AI 与外部 harness 操作同一份本地数据，并共用校验、审批、版本冲突和历史恢复。默认 AI 写入需要网页确认；自动接受只省略人工确认，仍保存历史。真实模型需用户配置，自动测试使用模拟 HTTP 接口，不代表真实供应商连接已验证。
 
 - 数据本体是 `data/workspace.json`、`data/ai/*.md` 和 `data/reflections/**/*.md`；外部工具可以直接阅读，但规范修改应使用下述接口。
 - 每轮安排前调用 `context`，读取最新长期背景、短期安排和任务版本；反思正文仅在明确选择后读取，不默认读取整个反思或历史目录。
@@ -69,13 +69,13 @@ npm run --silent harness -- context --file /tmp/focus-context.json
   "baseHash": "用读取结果中的64位哈希替换",
   "summary": "新增今天的专注事项",
   "operations": [
-    { "type": "task.create", "id": "focus-example", "title": "完成第一份草稿", "priority": "P1", "categoryId": "work" },
+    { "type": "task.create", "id": "focus-example", "title": "完成第一份草稿", "parentId": null, "tagIds": ["P1"] },
     { "type": "placement.put", "taskId": "focus-example", "placement": { "id": "placement-example", "kind": "day", "date": "2026-11-03" } }
   ]
 }
 ```
 
-分类 ID 必须使用当前 `categories` 返回的 ID；上面的 `work` 仅用于说明。`schema` 返回完整操作结构，不接受任意路径、脚本、设置修改或未知字段。
+标签 ID 必须使用当前 `tags` 返回的 ID；上面的 `P1` 仅用于说明，旧数据迁移后的 ID 可能不同。`schema` 返回完整操作结构，不接受任意路径、脚本、设置修改或未知字段。
 
 ```sh
 npm run --silent harness -- preview --file /tmp/focus-proposal.json
@@ -84,7 +84,7 @@ npm run --silent harness -- submit 返回的提案ID --request-id 本次唯一�
 
 `preview` 返回持久化提案 ID 和真实前后内容。`submit` 返回 `pending_confirmation` 时，在网页打开提案并确认；`applied` 代表保存完成，可追踪 `changeId`。冲突时重新读取并生成新提案。网络超时后使用**同一提案与同一 requestId**重试，不重复创建；提案已应用后重试会返回已有结果。
 
-操作名包括：`category.create/update`、`project.create/update`、`task.create/update`、`placement.put/remove`、`text.write`。归档使用 update 中的 `archivedAt`，恢复设为 `null`；完成任务使用 `status: "done"`。项目任务保存 `projectId`，独立任务保存 `categoryId`。拖动已有排期时沿用其 ID；一个任务可有多个定时安排，允许重叠。
+操作名包括：`tag.create/update`、`task.create/update`、`placement.put/remove`、`text.write`。归档使用 update 中的 `archivedAt`，恢复设为 `null`；完成任务使用 `status: "done"`。任务使用 `parentId` 保存父任务 ID，根任务为 `null`，用 `tagIds` 保存多个标签 ID；标签名称禁止包含 "/"。父任务完成会完成后代；全部子任务完成会向上完成祖先；重新打开子任务会重新打开祖先。联动可能影响当前选择范围外的同树任务，提案须明确影响。拖动已有排期时沿用其 ID；一个任务可有多个定时安排，允许重叠。
 
 ## 背景、反思与历史
 

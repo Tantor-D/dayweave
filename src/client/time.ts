@@ -99,3 +99,18 @@ export function taskOnDay(task: Task, date: string) {
       : dateOf(p.startAt) <= date && Date.parse(p.endAt) > Date.parse(atMinute(date, 0)),
   );
 }
+
+export function selectedRange(
+  anchor: string,
+  endpoint: string,
+  id: string,
+): Extract<Placement, { kind: 'timed' }> {
+  const a = Date.parse(anchor),
+    b = Date.parse(endpoint);
+  return {
+    id,
+    kind: 'timed',
+    startAt: new Date(Math.min(a, b)).toISOString(),
+    endAt: new Date(Math.max(a, b) + (a === b ? 15 * 60000 : 0)).toISOString(),
+  };
+}

@@ -1,3 +1,5 @@
+import { TaskFields, emptyTaskDraft } from './TaskFields';
+import { ancestors, taskPath, treeOrder } from '../domain/tree';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
@@ -11,7 +13,6 @@ import {
   Filter,
   Folder,
   History,
-  LayoutGrid,
   LoaderCircle,
   Moon,
   Plus,
@@ -44,7 +45,6 @@ import {
   ReviewPanel,
   SettingsPanel,
   TaskDetail,
-  priorityLabels,
 } from './Panels';
 import { addDays, atMinute, datesFrom, today } from './time';
 import { themeStyle, ViewLayout, ThemeContext, ThemeCard } from './themes';
@@ -54,8 +54,7 @@ const initialPreferences: Preferences = {
   days: 3,
   orientation: 'vertical',
   panelWidth: 282,
-  hiddenCategories: [],
-  hiddenProjects: [],
+  hiddenTags: [],
   hiddenTasks: [],
   hiddenStatuses: [],
   showArchived: false,
@@ -78,7 +77,7 @@ const panelTitles: Record<Panel, string> = {
   history: '修改历史',
   settings: '设置',
   filters: '显示筛选',
-  organization: '项目与分类',
+  organization: '标签管理',
   proposals: '变更提案',
 };
 export default function App() {
@@ -198,25 +197,21 @@ export default function App() {
   const filteredTasks =
     workspace?.tasks
       .filter((task) => {
-        const project = workspace.projects.find((p) => p.id === task.projectId),
-          category = project?.categoryId ?? task.categoryId;
+        const lineage = [task, ...ancestors(task, workspace.tasks)];
         return (
-          (preferences.showArchived ||
-            (!task.archivedAt &&
-              !project?.archivedAt &&
-              !workspace.categories.find((c) => c.id === category)?.archivedAt)) &&
-          !preferences.hiddenTasks.includes(task.id) &&
-          !preferences.hiddenProjects.includes(task.projectId ?? '') &&
-          !preferences.hiddenCategories.includes(category ?? '') &&
+          (preferences.showArchived || lineage.every((t) => !t.archivedAt)) &&
+          !lineage.some((t) => preferences.hiddenTasks.includes(t.id)) &&
+          !task.tagIds.some((id) => preferences.hiddenTags.includes(id)) &&
           !preferences.hiddenStatuses.includes(task.status) &&
           (!search ||
-            `${task.title} ${task.description}`.toLowerCase().includes(search.toLowerCase()))
+            `${taskPath(task, workspace.tasks)} ${task.description}`
+              .toLowerCase()
+              .includes(search.toLowerCase()))
         );
       })
       .sort((a, b) => a.order - b.order) || [];
   const filterCount =
-    preferences.hiddenCategories.length +
-    preferences.hiddenProjects.length +
+    preferences.hiddenTags.length +
     preferences.hiddenTasks.length +
     preferences.hiddenStatuses.length;
   const pending = proposals.filter((p) => p.status === 'pending_confirmation').length;
@@ -239,26 +234,23 @@ export default function App() {
   };
   const loadExample = async () => {
     if (!workspace) return;
-    const categoryId = workspace.categories.find((c) => !c.archivedAt)?.id;
-    if (!categoryId) return;
-    const projectId = crypto.randomUUID(),
+    const rootId = crypto.randomUUID(),
       a = crypto.randomUUID(),
       b = crypto.randomUUID();
     await save(
       [
         {
-          type: 'project.create',
-          id: projectId,
-          title: '我的第一个项目',
-          categoryId,
+          type: 'task.create',
+          id: rootId,
+          title: '我的第一组任务',
           description: '这是一组可编辑、可归档的示例。',
         },
         {
           type: 'task.create',
           id: a,
           title: '为今天选一个重点',
-          projectId,
-          priority: 'P1',
+          parentId: rootId,
+          tagIds: workspace.tags.filter((t) => t.name === 'P1').map((t) => t.id),
           description: '把任务拖入时间轴，给专注留一段时间。',
         },
         {
@@ -275,7 +267,6 @@ export default function App() {
           type: 'task.create',
           id: b,
           title: '散步，让思绪透透气',
-          categoryId: workspace.categories[1]?.id ?? categoryId,
         },
         {
           type: 'placement.put',
@@ -289,6 +280,8 @@ export default function App() {
   const taskRow = (task: Task) => (
     <div
       key={task.id}
+      style={{ marginLeft: Math.min(ancestors(task, workspace?.tasks ?? []).length, 8) * 14 }}
+      title={taskPath(task, workspace?.tasks ?? [])}
       className={`${s.taskRow} ${selected === task.id && panel === 'task' ? s.selectedTask : ''} ${task.status === 'done' ? s.done : ''}`}
       onPointerDown={(e) => start(e, task)}
       onClick={() => select(task.id)}
@@ -329,8 +322,10 @@ export default function App() {
         <div className={s.taskText}>
           <span>{task.title}</span>
           <small>
-            <i className={`${s.priorityDot} ${s[task.priority]}`} />
-            {task.priority}
+            {workspace?.tags
+              .filter((t) => task.tagIds.includes(t.id))
+              .map((t) => t.name)
+              .join(' · ')}
             {task.placements.length > 0 && (
               <>
                 <span>·</span>
@@ -453,7 +448,7 @@ export default function App() {
                     <span>所有事项</span>
                     <button onClick={() => togglePanel('organization')}>
                       <Folder size={13} />
-                      项目与分类
+                      标签管理
                     </button>
                   </div>
                   <div className={s.taskList}>
@@ -485,8 +480,7 @@ export default function App() {
                           <button
                             onClick={() =>
                               void updatePreferences({
-                                hiddenCategories: [],
-                                hiddenProjects: [],
+                                hiddenTags: [],
                                 hiddenTasks: [],
                                 hiddenStatuses: [],
                               })
@@ -497,34 +491,7 @@ export default function App() {
                         )}
                       </div>
                     ) : (
-                      <>
-                        {filteredTasks.some((t) => !t.projectId) && (
-                          <section className={s.taskGroup}>
-                            <h3>
-                              <LayoutGrid size={13} />
-                              独立任务
-                              <span>{filteredTasks.filter((t) => !t.projectId).length}</span>
-                            </h3>
-                            {filteredTasks.filter((t) => !t.projectId).map(taskRow)}
-                          </section>
-                        )}
-                        {workspace.projects
-                          .slice()
-                          .sort((a, b) => a.order - b.order)
-                          .filter((p) => filteredTasks.some((t) => t.projectId === p.id))
-                          .map((p) => (
-                            <section className={s.taskGroup} key={p.id}>
-                              <h3>
-                                <Folder size={13} />
-                                {p.title}
-                                <span>
-                                  {filteredTasks.filter((t) => t.projectId === p.id).length}
-                                </span>
-                              </h3>
-                              {filteredTasks.filter((t) => t.projectId === p.id).map(taskRow)}
-                            </section>
-                          ))}
-                      </>
+                      <>{treeOrder(filteredTasks).map(taskRow)}</>
                     )}
                   </div>
                   <div className={s.sidebarFoot}>
@@ -752,10 +719,7 @@ function NewTaskDialog({
   onCreate: (ops: Operation[]) => Promise<void>;
   onClose: () => void;
 }) {
-  const [title, setTitle] = useState(''),
-    [priority, setPriority] = useState<Task['priority']>('P2'),
-    [projectId, setProject] = useState(''),
-    [categoryId, setCategory] = useState(workspace.categories.find((c) => !c.archivedAt)?.id ?? ''),
+  const [draft, setDraft] = useState(emptyTaskDraft),
     [busy, setBusy] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -764,10 +728,7 @@ function NewTaskDialog({
       await onCreate([
         {
           type: 'task.create',
-          title,
-          priority,
-          projectId: projectId || null,
-          categoryId: projectId ? null : categoryId,
+          ...draft,
         },
       ]);
     } finally {
@@ -798,59 +759,7 @@ function NewTaskDialog({
           </button>
         </div>
         <form className={s.form} onSubmit={(e) => void submit(e)}>
-          <label>
-            想完成什么？
-            <input
-              autoFocus
-              required
-              aria-label="新任务名称"
-              placeholder="用一句话写下这件事"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </label>
-          <div className={s.formRow}>
-            <label>
-              优先级
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as Task['priority'])}
-              >
-                {Object.entries(priorityLabels).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              项目
-              <select value={projectId} onChange={(e) => setProject(e.target.value)}>
-                <option value="">独立任务</option>
-                {workspace.projects
-                  .filter((p) => !p.archivedAt)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          </div>
-          {!projectId && (
-            <label>
-              分类
-              <select value={categoryId} onChange={(e) => setCategory(e.target.value)}>
-                {workspace.categories
-                  .filter((c) => !c.archivedAt)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
+          <TaskFields workspace={workspace} draft={draft} onChange={setDraft} />
           <p className={s.hint}>不必立刻安排时间，先把事情放下来。</p>
           <button className={s.primary} disabled={busy}>
             {busy ? <LoaderCircle className={s.spin} size={15} /> : <Plus size={15} />}创建任务

@@ -19,7 +19,7 @@ export interface ThemeDefinition {
 }
 function GlassCard({ task, children }: CardAppearanceProps) {
   return (
-    <span style={{ display: 'contents' }} data-card-priority={task.priority}>
+    <span style={{ display: 'contents' }} data-task-status={task.status}>
       {children}
     </span>
   );
@@ -35,10 +35,6 @@ const common = {
   '--radius': '24px',
   '--spacing': '16px',
   '--material-blur': '36px',
-  '--p0': '#c44750',
-  '--p1': '#b86a2c',
-  '--p2': '#537fc5',
-  '--p3': '#5c8c78',
 };
 export const themes: Record<ThemeDefinition['id'], ThemeDefinition> = {
   'glass-light': {
@@ -89,10 +85,6 @@ export const themes: Record<ThemeDefinition['id'], ThemeDefinition> = {
       '--ambient-one': '#353046',
       '--ambient-two': '#203440',
       '--ambient-three': '#332c31',
-      '--p0': '#f58b92',
-      '--p1': '#eeb879',
-      '--p2': '#9abff6',
-      '--p3': '#8ac5aa',
     },
   },
 };

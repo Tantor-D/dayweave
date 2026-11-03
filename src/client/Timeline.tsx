@@ -7,7 +7,16 @@ import {
 } from 'react';
 import { Check, GripVertical } from 'lucide-react';
 import type { Operation, Placement, Task } from '../domain/types';
-import { atMinute, clockLabel, placementAt, segmentsFor, snap, today, weekday } from './time';
+import {
+  atMinute,
+  clockLabel,
+  selectedRange,
+  placementAt,
+  segmentsFor,
+  snap,
+  today,
+  weekday,
+} from './time';
 import s from './App.module.css';
 import { ThemeCard } from './themes';
 export type DragMode = 'move' | 'start' | 'end';
@@ -180,6 +189,85 @@ export function Timeline({
   selectedId,
 }: Props) {
   const scroll = useRef<HTMLDivElement>(null);
+  const [range, setRange] = useState<Extract<Placement, { kind: 'timed' }>>();
+  const selection = useRef<{
+    anchor: string;
+    id: string;
+    x: number;
+    y: number;
+    pointerId: number;
+    moved: boolean;
+    placement?: Placement;
+  } | null>(null);
+  const suppressRangeClick = useRef(0);
+  const scheduleRef = useRef(onSchedule);
+  scheduleRef.current = onSchedule;
+  const [selecting, setSelecting] = useState(false);
+  useEffect(() => {
+    if (!selecting) return;
+    const cancel = () => {
+      selection.current = null;
+      setSelecting(false);
+      setRange(undefined);
+      suppressRangeClick.current = Date.now() + 350;
+    };
+    const move = (event: PointerEvent) => {
+      const state = selection.current;
+      if (!state || event.pointerId !== state.pointerId) return;
+      if (!state.moved && Math.hypot(event.clientX - state.x, event.clientY - state.y) < 5) return;
+      event.preventDefault();
+      state.moved = true;
+      const cell = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest('[data-time-date]') as HTMLElement | null;
+      if (!cell || !scroll.current?.contains(cell)) {
+        state.placement = undefined;
+        setRange(undefined);
+        return;
+      }
+      const rect = cell.getBoundingClientRect();
+      const ratio =
+        cell.dataset.axis === 'horizontal'
+          ? (event.clientX - rect.left) / rect.width
+          : (event.clientY - rect.top) / rect.height;
+      const endpoint = atMinute(
+        cell.dataset.timeDate!,
+        Math.max(0, Math.min(1440, Math.round((ratio * 1440) / 15) * 15)),
+      );
+      const next = selectedRange(state.anchor, endpoint, state.id);
+      state.placement = next;
+      setRange(next);
+    };
+    const up = (event: PointerEvent) => {
+      const state = selection.current;
+      if (!state || event.pointerId !== state.pointerId) return;
+      if (state.moved) move(event);
+      const placement = state.placement;
+      cancel();
+      if (placement) scheduleRef.current(placement);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancel();
+      }
+    };
+    document.addEventListener('pointermove', move, { passive: false });
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', cancel);
+    document.addEventListener('keydown', key);
+    window.addEventListener('blur', cancel);
+    document.body.style.userSelect = 'none';
+    return () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', cancel);
+      document.removeEventListener('keydown', key);
+      window.removeEventListener('blur', cancel);
+      document.body.style.userSelect = '';
+    };
+  }, [selecting]);
+
   useEffect(() => {
     const el = scroll.current;
     if (el) {
@@ -191,6 +279,9 @@ export function Timeline({
         el.scrollTop = 0;
       }
     }
+    selection.current = null;
+    setSelecting(false);
+    setRange(undefined);
   }, [orientation, dates[0]]);
   const renderTasks = tasks.map((task) =>
     preview?.preview && task.id === preview.task.id
@@ -299,6 +390,7 @@ export function Timeline({
                     {...scheduleEvents(date)}
                   >
                     {all[index].map((seg) => renderSegment(seg, daySizes[index]))}
+                    {renderRange(date)}
                     {date === today() && (
                       <div
                         className={s.nowLine}
@@ -327,6 +419,7 @@ export function Timeline({
                   {...scheduleEvents(date)}
                 >
                   {all[index].map((seg) => renderSegment(seg, daySizes[index]))}
+                  {renderRange(date)}
                   {date === today() && (
                     <div className={s.nowLine} style={{ top: `${(minutesNow / 1440) * 100}%` }} />
                   )}
@@ -341,7 +434,7 @@ export function Timeline({
           <span className={s.liveDot} />
           本机保存 · Asia/Shanghai
         </span>
-        <span>点击空白处安排 · 拖动调整 · 边缘拉伸</span>
+        <span>拖选范围安排 · 点击任务编辑 · 边缘拉伸</span>
       </div>
       {preview?.moved && (
         <div className={s.dragTip} style={{ left: preview.x + 16, top: preview.y + 16 }}>
@@ -359,19 +452,41 @@ export function Timeline({
     return {
       tabIndex: 0,
       role: 'group',
-      'aria-label': `${date} 时间轴，点击空白处或按回车安排任务`,
-      onClick: (event: React.MouseEvent<HTMLDivElement>) => {
-        if ((event.target as HTMLElement).closest('[data-placement]')) return;
+      'aria-label': `${date} 时间轴，拖选时间范围或按回车安排任务`,
+      onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
+        if (
+          event.button !== 0 ||
+          !event.isPrimary ||
+          preview ||
+          (event.target as HTMLElement).closest('[data-placement]')
+        )
+          return;
+        event.preventDefault();
         event.currentTarget.focus({ preventScroll: true });
         const rect = event.currentTarget.getBoundingClientRect();
-        onSchedule(
-          placementAt(
-            date,
-            horizontal
-              ? (event.clientX - rect.left) / rect.width
-              : (event.clientY - rect.top) / rect.height,
-          ),
+        const initial = placementAt(
+          date,
+          horizontal
+            ? (event.clientX - rect.left) / rect.width
+            : (event.clientY - rect.top) / rect.height,
         );
+        if (initial.kind !== 'timed') return;
+        selection.current = {
+          anchor: initial.startAt,
+          id: initial.id,
+          x: event.clientX,
+          y: event.clientY,
+          pointerId: event.pointerId,
+          moved: false,
+          placement: initial,
+        };
+        setSelecting(true);
+      },
+      onClickCapture: (event: React.MouseEvent<HTMLDivElement>) => {
+        if (Date.now() < suppressRangeClick.current) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
       },
       onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
@@ -380,6 +495,31 @@ export function Timeline({
         }
       },
     };
+  }
+  function renderRange(date: string) {
+    if (!range) return null;
+    const midnight = Date.parse(atMinute(date, 0));
+    const start = Math.max(0, (Date.parse(range.startAt) - midnight) / 60000);
+    const end = Math.min(1440, (Date.parse(range.endAt) - midnight) / 60000);
+    if (end <= start) return null;
+    const style = horizontal
+      ? {
+          left: (start / 1440) * timeSize,
+          width: ((end - start) / 1440) * timeSize,
+          top: 2,
+          bottom: 2,
+        }
+      : {
+          top: (start / 1440) * timeSize,
+          height: ((end - start) / 1440) * timeSize,
+          left: 2,
+          right: 2,
+        };
+    return (
+      <div className={s.rangeSelection} style={style} aria-label="选定时间范围">
+        {clockLabel(range.startAt)}–{clockLabel(range.endAt)}
+      </div>
+    );
   }
   function renderSegment(seg: ReturnType<typeof segmentsFor>[number], size: number) {
     const { task, placement } = seg;
@@ -403,7 +543,7 @@ export function Timeline({
         role="button"
         tabIndex={0}
         aria-label={`${task.title} ${clockLabel(placement.startAt)} 至 ${clockLabel(placement.endAt)}`}
-        className={`${s.timeBlock} ${s[task.priority]} ${task.status === 'done' ? s.done : ''} ${selectedId === task.id ? s.selected : ''} ${preview?.original?.id === placement.id ? s.dragging : ''}`}
+        className={`${s.timeBlock} ${s.taskColor} ${task.status === 'done' ? s.done : ''} ${selectedId === task.id ? s.selected : ''} ${preview?.original?.id === placement.id ? s.dragging : ''}`}
         style={css}
         onPointerDown={(e) => onDrag(e, task, placement)}
         onClick={() => onSelect(task.id)}
@@ -428,7 +568,6 @@ export function Timeline({
             {clockLabel(placement.startAt)}–{clockLabel(placement.endAt)}
             {!seg.last ? ' →' : ''}
           </span>
-          <small>{task.priority}</small>
         </ThemeCard>
         {seg.last && (
           <span
@@ -482,7 +621,7 @@ function DayDrop({
           data-placement={p.id}
           role="button"
           tabIndex={0}
-          className={`${s.dayChip} ${s[task.priority]} ${task.status === 'done' ? s.done : ''}`}
+          className={`${s.dayChip} ${s.taskColor} ${task.status === 'done' ? s.done : ''}`}
           onPointerDown={(e) => onDrag(e, task, p)}
           onClick={() => onSelect(task.id)}
           onKeyDown={(e) => {

@@ -1,3 +1,4 @@
+import { legacyPreferencesSchema } from '../domain/legacy.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -49,8 +50,7 @@ const defaults: Preferences = {
   days: 3,
   orientation: 'vertical',
   panelWidth: 300,
-  hiddenCategories: [],
-  hiddenProjects: [],
+  hiddenTags: [],
   hiddenTasks: [],
   hiddenStatuses: [],
   showArchived: false,
@@ -326,7 +326,47 @@ export class Store {
           await atomicWrite(this.targetPath(target), '');
         this.known.set(target, content ?? '');
       }
-    if (!this.globalReadOnly) await this.saveKnown();
+    if (!this.globalReadOnly) {
+      const current = await textFile(this.targetPath('workspace'));
+      if (
+        current &&
+        current === this.known.get('workspace') &&
+        !this.readonlyReasons.has('workspace') &&
+        JSON.parse(current).schemaVersion === 1
+      ) {
+        const migrated = validateWorkspace(JSON.parse(current));
+        migrated.revision++;
+        await atomicWrite(
+          join(this.historyDir, 'workspace-v1-' + hashContent(current) + '.backup'),
+          current,
+        );
+        await this.commit(
+          {
+            target: 'workspace',
+            before: current,
+            after: serialize(migrated),
+            source: 'user',
+            approval: 'manual',
+            summary: 'v0.2.0 迁移任务树与标签',
+            requestId: randomUUID(),
+            completionEvents: [],
+          },
+          hashContent(current),
+        );
+      }
+      for (const p of this.proposalMap.values()) {
+        if (
+          p.target === 'workspace' &&
+          ['preview', 'pending_confirmation'].includes(p.status) &&
+          JSON.parse(p.after).schemaVersion === 1
+        ) {
+          p.status = 'conflict';
+          p.error = '任务模型已升级，请重新生成提案';
+          await this.saveProposal(p);
+        }
+      }
+      await this.saveKnown();
+    }
   }
   private async saveKnown(): Promise<void> {
     await atomicWrite(
@@ -364,7 +404,7 @@ export class Store {
     const diskHash = hashContent(disk);
     const data =
       target === 'workspace'
-        ? (JSON.parse(content ?? serialize(emptyWorkspace())) as Workspace)
+        ? validateWorkspace(JSON.parse(content ?? serialize(emptyWorkspace())))
         : (content ?? '');
     const snapshot: Snapshot = {
       target,
@@ -718,7 +758,46 @@ export class Store {
     const raw = await textFile(join(this.dataDir, 'preferences.json'));
     if (!raw) return structuredClone(defaults);
     try {
-      return preferencesSchema.parse(JSON.parse(raw));
+      const parsed = JSON.parse(raw);
+      if ('hiddenCategories' in parsed || 'hiddenProjects' in parsed) {
+        // Validate the old shape before translating persisted visibility preferences.
+        const old = legacyPreferencesSchema.parse(parsed);
+        const trusted = this.known.get('workspace');
+        const prior =
+          this.changes.find(
+            (c) => c.target === 'workspace' && c.before && JSON.parse(c.before).schemaVersion === 1,
+          )?.before ?? (trusted && JSON.parse(trusted).schemaVersion === 1 ? trusted : null);
+        const legacy = prior ? JSON.parse(prior) : null;
+        const current = validateWorkspace(JSON.parse(this.known.get('workspace')!));
+        const converted = legacy ? validateWorkspace(legacy) : null;
+        const hiddenTags = legacy
+          ? legacy.categories
+              .filter((c: { id: string }) => old.hiddenCategories.includes(c.id))
+              .flatMap((c: { name: string }) =>
+                converted!.tags
+                  .filter(
+                    (t) =>
+                      t.name === c.name.replaceAll('/', '／').trim() &&
+                      current.tags.some((active) => active.id === t.id),
+                  )
+                  .map((t) => t.id),
+              )
+          : [];
+        const hiddenRoots = legacy
+          ? legacy.projects.flatMap((p: { id: string }, index: number) =>
+              old.hiddenProjects.includes(p.id)
+                ? [converted!.tasks[legacy.tasks.length + index].id]
+                : [],
+            )
+          : [];
+        const { hiddenCategories, hiddenProjects, ...rest } = old;
+        return preferencesSchema.parse({
+          ...rest,
+          hiddenTags,
+          hiddenTasks: [...new Set([...old.hiddenTasks, ...hiddenRoots])],
+        });
+      }
+      return preferencesSchema.parse(parsed);
     } catch {
       return coded(
         'INVALID_PREFERENCES',

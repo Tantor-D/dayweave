@@ -1,3 +1,5 @@
+import { TaskFields, emptyTaskDraft } from './TaskFields';
+import { ancestors, taskPath } from '../domain/tree';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CalendarPlus, LoaderCircle, Search, X } from 'lucide-react';
 import type { Operation, Placement, Workspace } from '../domain/types';
@@ -17,13 +19,10 @@ export function ScheduleDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<'new' | 'existing'>('new');
-  const [title, setTitle] = useState('');
+  const [draft, setDraft] = useState(emptyTaskDraft);
+  const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState('');
   const [taskId, setTaskId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [categoryId, setCategoryId] = useState(
-    workspace.categories.find((c) => !c.archivedAt)?.id ?? '',
-  );
   const [date, setDate] = useState(
     placement.kind === 'day' ? placement.date : dateOf(placement.startAt),
   );
@@ -38,21 +37,19 @@ export function ScheduleDialog({
     element.showModal();
     return () => element.close();
   }, []);
-  const available = workspace.tasks.filter((task) => {
-    const project = workspace.projects.find((p) => p.id === task.projectId);
-    const category = workspace.categories.find(
-      (c) => c.id === (project?.categoryId ?? task.categoryId),
-    );
-    return !task.archivedAt && !project?.archivedAt && !category?.archivedAt;
-  });
+  const available = workspace.tasks.filter(
+    (task) => !task.archivedAt && !ancestors(task, workspace.tasks).some((t) => t.archivedAt),
+  );
   const matches = available.filter((task) =>
-    `${task.title} ${task.description}`.toLowerCase().includes(query.toLowerCase()),
+    `${taskPath(task, workspace.tasks)} ${task.description}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
   );
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
     setError('');
-    if (mode === 'new' && !title.trim()) {
+    if ((mode === 'new' || taskId) && !draft.title.trim()) {
       setError('请填写任务名称。');
       return;
     }
@@ -70,9 +67,19 @@ export function ScheduleDialog({
       operations.push({
         type: 'task.create',
         id,
-        title: title.trim(),
-        projectId: projectId || null,
-        categoryId: projectId ? null : categoryId,
+        ...draft,
+        title: draft.title.trim(),
+      });
+    if (mode === 'existing' && taskId)
+      operations.push({
+        type: 'task.update',
+        id: taskId,
+        patch: {
+          title: draft.title.trim(),
+          description: draft.description,
+          parentId: draft.parentId,
+          tagIds: draft.tagIds,
+        },
       });
     operations.push({
       type: 'placement.put',
@@ -116,7 +123,11 @@ export function ScheduleDialog({
             type="button"
             aria-pressed={mode === 'new'}
             className={mode === 'new' ? s.active : ''}
-            onClick={() => setMode('new')}
+            onClick={() => {
+              setMode('new');
+              setDraft(emptyTaskDraft());
+              setEditing(false);
+            }}
           >
             新建任务
           </button>
@@ -124,57 +135,17 @@ export function ScheduleDialog({
             type="button"
             aria-pressed={mode === 'existing'}
             className={mode === 'existing' ? s.active : ''}
-            onClick={() => setMode('existing')}
+            onClick={() => {
+              setMode('existing');
+              if (taskId) setDraft(available.find((t) => t.id === taskId)!);
+              setEditing(false);
+            }}
           >
             关联已有任务
           </button>
         </div>
         {mode === 'new' ? (
-          <>
-            <label>
-              任务名称
-              <input
-                autoFocus
-                required
-                maxLength={300}
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="想在这段时间完成什么？"
-              />
-            </label>
-            <div className={s.formRow}>
-              <label>
-                项目
-                <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-                  <option value="">独立任务</option>
-                  {workspace.projects
-                    .filter((p) => !p.archivedAt)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              {!projectId && (
-                <label>
-                  分类
-                  <select
-                    value={categoryId}
-                    onChange={(event) => setCategoryId(event.target.value)}
-                  >
-                    {workspace.categories
-                      .filter((c) => !c.archivedAt)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-              )}
-            </div>
-          </>
+          <TaskFields workspace={workspace} draft={draft} onChange={setDraft} />
         ) : (
           <>
             <label>
@@ -195,14 +166,17 @@ export function ScheduleDialog({
                       type="radio"
                       name="existing-task"
                       checked={taskId === task.id}
-                      onChange={() => setTaskId(task.id)}
+                      onChange={() => {
+                        setTaskId(task.id);
+                        setDraft(task);
+                        setEditing(true);
+                      }}
                     />
                     <span>
-                      {task.title}
+                      {taskPath(task, workspace.tasks)}
                       <small>
-                        {workspace.projects.find((p) => p.id === task.projectId)?.title ??
-                          '独立任务'}{' '}
-                        · {task.placements.length} 次安排{task.status === 'done' ? ' · 已完成' : ''}
+                        {'任务'} · {task.placements.length} 次安排
+                        {task.status === 'done' ? ' · 已完成' : ''}
                       </small>
                     </span>
                   </label>
@@ -211,6 +185,14 @@ export function ScheduleDialog({
                 <p className={s.hint}>没有匹配的未归档任务。</p>
               )}
             </div>
+            {taskId && (
+              <button type="button" onClick={() => setEditing(!editing)}>
+                {editing ? '收起任务设置' : '编辑任务设置'}
+              </button>
+            )}
+            {editing && taskId && (
+              <TaskFields workspace={workspace} draft={draft} taskId={taskId} onChange={setDraft} />
+            )}
             <p className={s.hint}>
               {taskId
                 ? `已选择：${available.find((task) => task.id === taskId)?.title}`

@@ -122,14 +122,14 @@ test('AI reloads both backgrounds each request; reflection attachments are expli
 test('context selects local dates across midnight and respects an explicitly empty task scope', async (t) => {
   const { store } = await fixture(t, (_body, res) => answer(res));
   const base = await store.read('workspace');
-  const categoryId = (base.data as Workspace).categories[0].id;
+  const tagIds = [(base.data as Workspace).tags[0].id];
   const p = await store.preview(
     {
       target: 'workspace',
       baseHash: base.hash,
       baseRevision: base.revision,
       operations: [
-        { type: 'task.create', id: 'night', title: '跨午夜', categoryId },
+        { type: 'task.create', id: 'night', title: '跨午夜', tagIds },
         {
           type: 'placement.put',
           taskId: 'night',
@@ -140,7 +140,7 @@ test('context selects local dates across midnight and respects an explicitly emp
             endAt: '2026-11-04T00:15:00+08:00',
           },
         },
-        { type: 'task.create', id: 'later', title: '后天', categoryId },
+        { type: 'task.create', id: 'later', title: '后天', tagIds },
         {
           type: 'placement.put',
           taskId: 'later',
@@ -172,7 +172,7 @@ test('web AI proposals use default confirmation, persist dependencies, and apply
             type: 'task.create',
             id: 'ai-task',
             title: '网页 AI 任务',
-            categoryId: ctx.workspace.data.categories[0].id,
+            tagIds: [ctx.workspace.data.tags[0].id],
           },
         ],
       },
@@ -226,7 +226,7 @@ test('auto-accepted workspace and document proposals retain history; repeating a
           {
             type: 'task.create',
             title: '自动接受任务',
-            categoryId: ctx.workspace.data.categories[0].id,
+            tagIds: [ctx.workspace.data.tags[0].id],
           },
         ],
       },

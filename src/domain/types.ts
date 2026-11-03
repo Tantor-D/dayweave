@@ -5,17 +5,9 @@ export type Target =
 export type Placement =
   | { id: string; kind: 'day'; date: string }
   | { id: string; kind: 'timed'; startAt: string; endAt: string };
-export interface Category {
+export interface Tag {
   id: string;
   name: string;
-  order: number;
-  archivedAt: string | null;
-}
-export interface Project {
-  id: string;
-  title: string;
-  description: string;
-  categoryId: string;
   order: number;
   archivedAt: string | null;
 }
@@ -24,9 +16,8 @@ export interface Task {
   title: string;
   description: string;
   status: 'todo' | 'in_progress' | 'done';
-  priority: 'P0' | 'P1' | 'P2' | 'P3';
-  projectId: string | null;
-  categoryId: string | null;
+  parentId: string | null;
+  tagIds: string[];
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -35,30 +26,22 @@ export interface Task {
   placements: Placement[];
 }
 export interface Workspace {
-  schemaVersion: 1;
+  schemaVersion: 2;
   revision: number;
   timezone: 'Asia/Shanghai';
-  categories: Category[];
-  projects: Project[];
+  tags: Tag[];
   tasks: Task[];
 }
 export type Operation =
-  | { type: 'category.create'; id?: string; name: string }
-  | {
-      type: 'category.update';
-      id: string;
-      patch: Partial<Pick<Category, 'name' | 'order' | 'archivedAt'>>;
-    }
-  | { type: 'project.create'; id?: string; title: string; categoryId: string; description?: string }
-  | { type: 'project.update'; id: string; patch: Partial<Omit<Project, 'id'>> }
+  | { type: 'tag.create'; id?: string; name: string }
+  | { type: 'tag.update'; id: string; patch: Partial<Pick<Tag, 'name' | 'order' | 'archivedAt'>> }
   | {
       type: 'task.create';
       id?: string;
       title: string;
       description?: string;
-      categoryId?: string | null;
-      projectId?: string | null;
-      priority?: Task['priority'];
+      parentId?: string | null;
+      tagIds?: string[];
     }
   | {
       type: 'task.update';
@@ -66,14 +49,7 @@ export type Operation =
       patch: Partial<
         Pick<
           Task,
-          | 'title'
-          | 'description'
-          | 'status'
-          | 'priority'
-          | 'categoryId'
-          | 'projectId'
-          | 'order'
-          | 'archivedAt'
+          'title' | 'description' | 'status' | 'parentId' | 'tagIds' | 'order' | 'archivedAt'
         >
       >;
     }
@@ -135,8 +111,7 @@ export interface Preferences {
   days: 1 | 3 | 7;
   orientation: 'vertical' | 'horizontal';
   panelWidth: number;
-  hiddenCategories: string[];
-  hiddenProjects: string[];
+  hiddenTags: string[];
   hiddenTasks: string[];
   hiddenStatuses: Task['status'][];
   showArchived: boolean;

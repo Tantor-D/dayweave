@@ -54,42 +54,31 @@ async function apply(
 }
 
 // Input and domain invariants are independent of transport and presentation.
-test('domain: inherited category, defaults, completion, reopening and reference validation', () => {
-  const start = emptyWorkspace();
-  const created = applyOperations(start, [
-    { type: 'project.create', id: 'project', title: '项目', categoryId: 'work' },
-    { type: 'task.create', id: 'task', title: '任务', projectId: 'project' },
+test('domain: tree defaults, completion, reopening and reference validation', () => {
+  const created = applyOperations(emptyWorkspace(), [
+    { type: 'task.create', id: 'root', title: '根任务' },
+    { type: 'task.create', id: 'child', title: '子任务', parentId: 'root' },
   ]).workspace;
-  assert.equal(created.tasks[0].categoryId, null);
-  assert.equal(created.tasks[0].priority, 'P2');
+  assert.deepEqual(created.tasks[1].tagIds, []);
+  assert.equal(created.tasks[1].parentId, 'root');
   const done = applyOperations(created, [
-    { type: 'task.update', id: 'task', patch: { status: 'done' } },
+    { type: 'task.update', id: 'child', patch: { status: 'done' } },
   ]);
-  assert.equal(done.completionEvents.length, 1);
-  assert.ok(done.workspace.tasks[0].completedAt);
+  assert.equal(done.completionEvents.length, 2);
+  assert.ok(done.workspace.tasks.every((t) => t.status === 'done' && t.completedAt));
   const reopened = applyOperations(done.workspace, [
-    { type: 'task.update', id: 'task', patch: { status: 'todo', projectId: null } },
-  ]);
-  assert.equal(reopened.workspace.tasks[0].completedAt, null);
-  assert.equal(reopened.workspace.tasks[0].categoryId, 'work');
-  assert.throws(() =>
-    applyOperations(created, [
-      { type: 'category.update', id: 'work', patch: { archivedAt: new Date().toISOString() } },
-    ]),
-  );
-  assert.throws(() =>
-    applyOperations(created, [
-      { type: 'task.update', id: 'task', patch: { projectId: 'missing' } },
-    ]),
-  );
-  assert.throws(() =>
-    applyOperations(created, [
-      { type: 'task.update', id: 'task', patch: { priority: 'P9' as any } },
-    ]),
-  );
-  assert.throws(() =>
-    applyOperations(created, [{ type: 'task.update', id: 'task', patch: { title: '  ' } }]),
-  );
+    { type: 'task.update', id: 'child', patch: { status: 'todo' } },
+  ]).workspace;
+  assert.equal(reopened.tasks[0].status, 'in_progress');
+  assert.equal(reopened.tasks[1].completedAt, null);
+  for (const patch of [
+    { parentId: 'missing' },
+    { parentId: 'child' },
+    { tagIds: ['missing'] },
+    { title: '  ' },
+  ])
+    assert.throws(() => applyOperations(created, [{ type: 'task.update', id: 'root', patch }]));
+  assert.throws(() => applyOperations(created, [{ type: 'tag.create', name: '工作/生活' }]));
 });
 test('domain: untimed deduplication, conversion, unrestricted overlap and UTC normalization', () => {
   let w = applyOperations(emptyWorkspace(), [
@@ -317,7 +306,7 @@ test('document targets, schema-version and unknown operation rejection', async (
       'harness',
     ),
   );
-  const invalid = { ...emptyWorkspace(), schemaVersion: 2 };
+  const invalid = { ...emptyWorkspace(), schemaVersion: 9 };
   assert.throws(() => validateWorkspace(invalid));
 });
 test('secrets are outside data, permission restricted, masked and preferences durable', async (t) => {
@@ -326,10 +315,10 @@ test('secrets are outside data, permission restricted, masked and preferences du
   assert.equal((await f.store.getSettings()).hasApiKey, true);
   assert.ok(!JSON.stringify(await f.store.getSettings()).includes('simulated-secret'));
   assert.equal((await stat(join(f.options.localDir, 'secrets.json'))).mode & 0o777, 0o600);
-  await f.store.updatePreferences({ theme: 'glass-dark', hiddenCategories: ['personal'], days: 7 });
+  await f.store.updatePreferences({ theme: 'glass-dark', hiddenTags: ['personal'], days: 7 });
   await f.restart();
   assert.equal((await f.store.getPreferences()).theme, 'glass-dark');
-  assert.deepEqual((await f.store.getPreferences()).hiddenCategories, ['personal']);
+  assert.deepEqual((await f.store.getPreferences()).hiddenTags, ['personal']);
 });
 test('exclusive lock rejects second process instance and releases on close', async (t) => {
   const f = await fixture(t);
@@ -446,11 +435,11 @@ test('serial writes apply only one of two proposals from same base', async (t) =
   assert.deepEqual(results.map((p) => p.status).sort(), ['applied', 'conflict']);
   assert.equal((await f.store.history()).length, 1);
 });
-test('project and task archives preserve placements; category migration is atomic', async (t) => {
+test('task tree and tag archives preserve placements and references', async (t) => {
   const f = await fixture(t);
   await apply(f.store, [
-    { type: 'project.create', id: 'p', title: 'P', categoryId: 'work' },
-    { type: 'task.create', id: 't', title: 'T', projectId: 'p' },
+    { type: 'task.create', id: 'p', title: '父任务' },
+    { type: 'task.create', id: 't', title: '子任务', parentId: 'p', tagIds: ['P1'] },
     {
       type: 'placement.put',
       taskId: 't',
@@ -458,19 +447,14 @@ test('project and task archives preserve placements; category migration is atomi
     },
   ]);
   await apply(f.store, [
-    { type: 'project.update', id: 'p', patch: { archivedAt: new Date().toISOString() } },
-    { type: 'task.update', id: 't', patch: { archivedAt: new Date().toISOString() } },
-  ]);
-  assert.equal(((await f.store.read('workspace')).data as Workspace).tasks[0].placements.length, 1);
-  await apply(f.store, [
-    { type: 'project.update', id: 'p', patch: { archivedAt: null, categoryId: 'personal' } },
-    { type: 'task.update', id: 't', patch: { archivedAt: null } },
-    { type: 'category.update', id: 'work', patch: { archivedAt: new Date().toISOString() } },
+    { type: 'task.update', id: 'p', patch: { archivedAt: new Date().toISOString() } },
+    { type: 'tag.update', id: 'P1', patch: { archivedAt: new Date().toISOString() } },
   ]);
   const w = (await f.store.read('workspace')).data as Workspace;
-  assert.equal(w.tasks[0].archivedAt, null);
-  assert.equal(w.projects[0].categoryId, 'personal');
-  assert.ok(w.categories[0].archivedAt);
+  assert.equal(w.tasks[1].placements.length, 1);
+  assert.equal(w.tasks[1].parentId, 'p');
+  assert.deepEqual(w.tasks[1].tagIds, ['P1']);
+  assert.ok(w.tags.find((t) => t.id === 'P1')!.archivedAt);
 });
 test('external edits made while service is stopped are detected from last committed snapshot', async (t) => {
   const f = await fixture(t);
