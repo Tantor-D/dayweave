@@ -51,6 +51,7 @@ export const workspaceSchema = z.strictObject({
   tasks: z.array(taskSchema),
 });
 export const operationSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('tag.remove'), id: idSchema }),
   z.strictObject({
     type: z.literal('tag.create'),
     id: idSchema.optional(),

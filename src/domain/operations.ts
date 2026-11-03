@@ -122,6 +122,17 @@ export function applyOperations(
           archivedAt: null,
         });
         break;
+      case 'tag.remove': {
+        if (!w.tags.some((t) => t.id === op.id)) fail('标签不存在');
+        w.tags = w.tags.filter((t) => t.id !== op.id);
+        for (const t of w.tasks) {
+          if (t.tagIds.includes(op.id)) {
+            t.tagIds = t.tagIds.filter((id) => id !== op.id);
+            t.updatedAt = now;
+          }
+        }
+        break;
+      }
       case 'tag.update':
         Object.assign(w.tags.find((t) => t.id === op.id) ?? fail('标签不存在'), op.patch);
         break;

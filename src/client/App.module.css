@@ -350,11 +350,11 @@
   font-weight: 400;
 }
 .taskRow {
-  padding: 13px 10px;
+  padding: 7px 10px;
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  margin-bottom: 4px;
+  margin-bottom: 1px;
   border: 1px solid transparent;
   border-radius: 13px;
   cursor: grab;
@@ -392,7 +392,7 @@
   align-items: center;
   font-size: 10px;
   color: var(--muted);
-  margin-top: 6px;
+  margin-top: 2px;
 }
 .taskGrip {
   color: var(--muted);
@@ -1917,4 +1917,99 @@
 .form .checkRow input {
   width: auto;
   flex-shrink: 0;
+}
+
+.tagList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tagRow,
+.tagCreate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+.tagRow.tagDrop {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.tagRow button,
+.tagCreate button {
+  padding: 5px;
+  border: 0;
+}
+.tagRow .tagHandle {
+  cursor: grab;
+  color: var(--muted);
+}
+.tagRow .tagHandle:active {
+  cursor: grabbing;
+}
+.tagRow .tagColor,
+.tagCreate .tagColor {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+}
+.tagColor::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.tagColor::-webkit-color-swatch {
+  border: 0;
+  border-radius: 50%;
+}
+.tagRow .tagName,
+.tagCreate input:not([type='color']) {
+  min-width: 0;
+  flex: 1;
+  width: 0;
+  padding: 5px 2px;
+  border: 0;
+  background: transparent;
+}
+.tagActions {
+  position: relative;
+}
+.tagMenu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 5;
+  min-width: 124px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px #0002;
+}
+.tagMenu button {
+  width: 100%;
+  justify-content: flex-start;
+}
+.tagCreate {
+  margin-top: 14px;
+}
+.tagDelete {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  margin: auto;
+  width: min(380px, 85vw);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 10px 60px #0005;
 }

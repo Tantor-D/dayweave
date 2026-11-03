@@ -84,7 +84,7 @@ npm run --silent harness -- submit 返回的提案ID --request-id 本次唯一�
 
 `preview` 返回持久化提案 ID 和真实前后内容。`submit` 返回 `pending_confirmation` 时，在网页打开提案并确认；`applied` 代表保存完成，可追踪 `changeId`。冲突时重新读取并生成新提案。网络超时后使用**同一提案与同一 requestId**重试，不重复创建；提案已应用后重试会返回已有结果。
 
-操作名包括：`tag.create/update`、`task.create/update`、`placement.put/remove`、`text.write`。归档使用 update 中的 `archivedAt`，恢复设为 `null`；完成任务使用 `status: "done"`。任务使用 `parentId` 保存父任务 ID，根任务为 `null`，用 `tagIds` 保存多个标签 ID；标签名称禁止包含 "/"。父任务完成会完成后代；全部子任务完成会向上完成祖先；重新打开子任务会重新打开祖先。联动可能影响当前选择范围外的同树任务，提案须明确影响。拖动已有排期时沿用其 ID；一个任务可有多个定时安排，允许重叠。
+操作名包括：`tag.create/update/remove`、`task.create/update`、`placement.put/remove`、`text.write`。归档使用 update 中的 `archivedAt`，恢复设为 `null`；完成任务使用 `status: "done"`。任务使用 `parentId` 保存父任务 ID，根任务为 `null`，用 `tagIds` 保存多个标签 ID；标签名称禁止包含 "/"。父任务完成会完成后代；全部子任务完成会向上完成祖先；重新打开子任务会重新打开祖先。联动可能影响当前选择范围外的同树任务，提案须明确影响。拖动已有排期时沿用其 ID；一个任务可有多个定时安排，允许重叠。
 
 ## 任务状态、颜色与标签传播
 
@@ -151,3 +151,5 @@ npm run --silent harness -- read --url http://127.0.0.1:4311 --local-dir /绝对
 也可设置 `WORKBENCH_URL` 和 `WORKBENCH_LOCAL_DIR`。harness 仅连接回环地址，不把工具凭据发到远程服务。错误以 JSON 输出且退出码非零；未运行时明确提示启动。浏览器令牌和 harness 令牌分开，外部工具不能通过 `source` 参数冒充网页手工操作。
 
 拥有本机同一用户文件权限的 AI 物理上仍能编辑文件，这不是权限隔离沙箱。绕过规范入口的修改会暂停该目标标准写入，由网页展示差异后显式采纳或恢复；未被采纳的版本不冒称为已审批。原始文件的多次外部直改中间状态不保证被逐个捕获；完整逐次历史覆盖规范入口以及显式采纳的最终外部版本。
+
+标签管理按拖拽顺序保存 `colorPriority`（越靠上越优先）。`tag.remove` 删除标签并清理所有任务中的对应引用，不删除任务；需要保留关联时使用归档。

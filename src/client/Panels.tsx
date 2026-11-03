@@ -3,6 +3,8 @@ import { TaskFields } from './TaskFields';
 import { taskPath } from '../domain/tree';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
+  GripVertical,
+  MoreHorizontal,
   ArrowDown,
   ArrowUp,
   Archive,
@@ -383,135 +385,265 @@ export function FilterPanel({
 export function OrganizationPanel({ workspace, save }: PanelProps) {
   const [name, setName] = useState('');
   const [color, setColor] = useState('#537fc5');
-  const [priority, setPriority] = useState(workspace.tags.length);
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState<string>();
+  const [over, setOver] = useState<string>();
+  const tags = [...workspace.tags].sort(
+    (a, b) => a.colorPriority - b.colorPriority || a.order - b.order || a.id.localeCompare(b.id),
+  );
+  const persist: Save = async (ops, summary) => {
+    setBusy(true);
+    try {
+      return await save(ops, summary);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const reorder = async (from: string, to: string) => {
+    if (from === to || busy) return;
+    const ordered = [...tags];
+    const source = ordered.findIndex((t) => t.id === from);
+    const target = ordered.findIndex((t) => t.id === to);
+    if (source < 0 || target < 0) return;
+    ordered.splice(target, 0, ordered.splice(source, 1)[0]);
+    await persist(
+      ordered.map((t, i) => ({
+        type: 'tag.update',
+        id: t.id,
+        patch: { order: i, colorPriority: i },
+      })),
+      '调整标签颜色优先顺序',
+    );
+  };
   return (
     <div className={s.panelContent}>
       <h2>标签管理</h2>
-      <p className={s.hint}>标签可多选，不分层级；名称不能包含 /。</p>
+      <p className={s.hint}>拖动左侧手柄排序，越靠上颜色越优先。名称不能包含 /。</p>
+      <div className={s.tagList} aria-label="标签优先顺序">
+        {tags.map((tag) => (
+          <div
+            key={tag.id}
+            data-tag-row={tag.id}
+            className={`${s.tagRow} ${over === tag.id ? s.tagDrop : ''}`}
+            onDragOver={(e) => {
+              if (dragging && !busy) {
+                e.preventDefault();
+                setOver(tag.id);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const from = dragging;
+              setDragging(undefined);
+              setOver(undefined);
+              if (from) void reorder(from, tag.id);
+            }}
+          >
+            <button
+              className={s.tagHandle}
+              aria-label={`拖动 ${tag.name} 排序`}
+              disabled={busy}
+              draggable={!busy}
+              onDragStart={(e) => {
+                setDragging(tag.id);
+                e.dataTransfer.setData('text/plain', tag.id);
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDragEnd={() => {
+                setDragging(undefined);
+                setOver(undefined);
+              }}
+              onKeyDown={(e) => {
+                const i = tags.findIndex((t) => t.id === tag.id);
+                const next = e.key === 'ArrowUp' ? i - 1 : e.key === 'ArrowDown' ? i + 1 : -1;
+                if (next >= 0 && next < tags.length) {
+                  e.preventDefault();
+                  void reorder(tag.id, tags[next].id);
+                }
+              }}
+            >
+              <GripVertical size={16} />
+            </button>
+            <TagEditor tag={tag} save={persist} busy={busy} />
+          </div>
+        ))}
+      </div>
       <form
-        className={s.form}
+        className={s.tagCreate}
         onSubmit={async (e) => {
           e.preventDefault();
-          if (
-            await save(
-              [{ type: 'tag.create', name: name.trim(), color, colorPriority: priority }],
-              '创建标签',
-            )
-          )
-            setName('');
+          const operations: Operation[] = tags.map((t, i) => ({
+            type: 'tag.update',
+            id: t.id,
+            patch: { colorPriority: i, order: i },
+          }));
+          operations.push({
+            type: 'tag.create',
+            name: name.trim(),
+            color,
+            colorPriority: tags.length,
+          });
+          if (await persist(operations, '创建标签')) setName('');
         }}
       >
-        <label>
-          标签名称
-          <input
-            aria-label="新标签名称"
-            required
-            pattern={'[^\\/]+'}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label>
-          颜色
-          <input
-            aria-label="新标签颜色"
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-          />
-        </label>
-        <label>
-          颜色优先级（数值越小越优先）
-          <input
-            aria-label="新标签颜色优先级"
-            type="number"
-            min={0}
-            max={9999}
-            required
-            value={priority}
-            onChange={(e) => setPriority(Number(e.target.value))}
-          />
-        </label>
-        <button className={s.primary}>创建标签</button>
-      </form>
-      {workspace.tags.map((tag) => (
-        <TagEditor key={tag.id + tag.name + tag.color + tag.colorPriority} tag={tag} save={save} />
-      ))}
-    </div>
-  );
-}
-function TagEditor({ tag, save }: { tag: Workspace['tags'][number]; save: Save }) {
-  const [name, setName] = useState(tag.name);
-  const [color, setColor] = useState(tag.color);
-  const [priority, setPriority] = useState(tag.colorPriority);
-  return (
-    <form
-      className={s.form}
-      onSubmit={(e) => {
-        e.preventDefault();
-        void save(
-          [
-            {
-              type: 'tag.update',
-              id: tag.id,
-              patch: { name: name.trim(), color, colorPriority: priority },
-            },
-          ],
-          '更新标签',
-        );
-      }}
-    >
-      <label>
-        标签名称
         <input
-          required
-          pattern={'[^\\/]+'}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </label>
-      <label>
-        颜色
-        <input
-          aria-label={tag.name + ' 颜色'}
+          className={s.tagColor}
+          aria-label="新标签颜色"
           type="color"
           value={color}
           onChange={(e) => setColor(e.target.value)}
+          disabled={busy}
         />
-      </label>
-      <label>
-        颜色优先级（数值越小越优先）
         <input
-          aria-label={tag.name + ' 颜色优先级'}
-          type="number"
-          min={0}
-          max={9999}
+          aria-label="新标签名称"
+          placeholder="新标签名称"
           required
-          value={priority}
-          onChange={(e) => setPriority(Number(e.target.value))}
+          pattern="[^/]+"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={busy}
         />
-      </label>
-      <div className={s.buttonRow}>
-        <button>保存标签</button>
-        <button
-          type="button"
-          onClick={() =>
-            void save(
-              [
-                {
-                  type: 'tag.update',
-                  id: tag.id,
-                  patch: { archivedAt: tag.archivedAt ? null : new Date().toISOString() },
-                },
-              ],
-              '更改标签归档状态',
-            )
-          }
-        >
-          {tag.archivedAt ? '恢复标签' : '归档标签'}
+        <button aria-label="创建标签" title="创建标签" disabled={busy || !name.trim()}>
+          <Plus size={17} />
         </button>
+      </form>
+    </div>
+  );
+}
+function TagEditor({
+  tag,
+  save,
+  busy,
+}: {
+  tag: Workspace['tags'][number];
+  save: Save;
+  busy: boolean;
+}) {
+  const [name, setName] = useState(tag.name);
+  const [menu, setMenu] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (deleting) deleteDialog.current?.showModal();
+  }, [deleting]);
+  useEffect(() => setName(tag.name), [tag.name]);
+  const rename = async () => {
+    if (name.trim() === tag.name) return;
+    if (!name.trim() || name.includes('/')) {
+      setName(tag.name);
+      return;
+    }
+    if (
+      !(await save(
+        [{ type: 'tag.update', id: tag.id, patch: { name: name.trim() } }],
+        '重命名标签',
+      ))
+    )
+      setName(tag.name);
+  };
+  return (
+    <>
+      <input
+        className={s.tagColor}
+        type="color"
+        aria-label={`${tag.name} 颜色`}
+        value={tag.color}
+        disabled={busy}
+        onChange={(e) =>
+          void save(
+            [{ type: 'tag.update', id: tag.id, patch: { color: e.target.value } }],
+            '更新标签颜色',
+          )
+        }
+      />
+      <input
+        className={s.tagName}
+        aria-label={`${tag.name} 名称`}
+        value={name}
+        disabled={busy}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={() => void rename()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur();
+          if (e.key === 'Escape') setName(tag.name);
+        }}
+      />
+      {tag.archivedAt && <small className={s.hint}>已归档</small>}
+      <div className={s.tagActions}>
+        <button
+          aria-label={`${tag.name} 更多操作`}
+          aria-expanded={menu}
+          disabled={busy}
+          onClick={() => setMenu(!menu)}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+        {menu && (
+          <div
+            className={s.tagMenu}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setMenu(false);
+            }}
+          >
+            <button
+              disabled={busy}
+              onClick={async () => {
+                if (
+                  await save(
+                    [
+                      {
+                        type: 'tag.update',
+                        id: tag.id,
+                        patch: { archivedAt: tag.archivedAt ? null : new Date().toISOString() },
+                      },
+                    ],
+                    '更改标签归档状态',
+                  )
+                )
+                  setMenu(false);
+              }}
+            >
+              <Archive size={14} />
+              {tag.archivedAt ? '恢复标签' : '归档标签'}
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setMenu(false);
+                setDeleting(true);
+              }}
+            >
+              <Trash2 size={14} />
+              删除标签
+            </button>
+          </div>
+        )}
       </div>
-    </form>
+      {deleting && (
+        <dialog
+          ref={deleteDialog}
+          onCancel={() => setDeleting(false)}
+          className={s.tagDelete}
+          aria-label="删除标签确认"
+        >
+          <p>删除“{tag.name}”并从所有任务中移除该标签？任务本身会保留。</p>
+          <div className={s.buttonRow}>
+            <button disabled={busy} onClick={() => setDeleting(false)}>
+              取消
+            </button>
+            <button
+              disabled={busy}
+              onClick={async () => {
+                if (await save([{ type: 'tag.remove', id: tag.id }], '删除标签及任务关联'))
+                  setDeleting(false);
+              }}
+            >
+              确认删除
+            </button>
+          </div>
+        </dialog>
+      )}
+    </>
   );
 }
 export function DocumentEditor({

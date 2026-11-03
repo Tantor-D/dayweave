@@ -187,3 +187,20 @@ test('explicit propagation also handles labels gained by reparenting a subtree',
   assert.deepEqual(w.tasks[1].tagIds, ['P0']);
   assert.deepEqual(new Set(w.tasks[2].tagIds), new Set(['P0', 'P4']));
 });
+
+test('removing a tag clears active and archived task references without removing tasks', () => {
+  let w = run(emptyWorkspace(), [
+    { type: 'task.create', id: 'root', title: 'Root', tagIds: ['P0', 'P1'] },
+    { type: 'task.create', id: 'child', title: 'Child', parentId: 'root' },
+    { type: 'task.update', id: 'child', patch: { archivedAt: now } },
+  ]);
+  w = run(w, [{ type: 'tag.remove', id: 'P0' }]);
+  assert.equal(w.tasks.length, 2);
+  assert.equal(
+    w.tags.some((t) => t.id === 'P0'),
+    false,
+  );
+  for (const t of w.tasks) assert.deepEqual(t.tagIds, ['P1']);
+  validateWorkspace(w);
+  assert.throws(() => run(w, [{ type: 'tag.remove', id: 'missing' }]));
+});

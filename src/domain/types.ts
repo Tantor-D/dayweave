@@ -35,6 +35,7 @@ export interface Workspace {
   tasks: Task[];
 }
 export type Operation =
+  | { type: 'tag.remove'; id: string }
   | { type: 'tag.create'; id?: string; name: string; color?: string; colorPriority?: number }
   | {
       type: 'tag.update';
