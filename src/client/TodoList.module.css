@@ -197,3 +197,34 @@
 .page .row .date {
   flex-shrink: 0;
 }
+
+/* Clay changes the material while retaining the shared list's compact geometry. */
+:global([data-theme='claymorphism-light']) .group {
+  border-color: transparent;
+  border-radius: 24px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+:global([data-theme='claymorphism-light']) .page button {
+  border-color: transparent;
+  border-radius: 999px;
+  box-shadow: var(--clay-soft);
+}
+:global([data-theme='claymorphism-light']) .page .title,
+:global([data-theme='claymorphism-light']) .page .groupTitle {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 8px;
+}
+:global([data-theme='claymorphism-light']) .page input:not([type='checkbox']) {
+  border-color: transparent;
+  border-radius: 14px;
+  box-shadow: var(--clay-inset);
+}
+:global([data-theme='claymorphism-light']) .presets [aria-pressed='true'] {
+  background: var(--clay-primary);
+  box-shadow: var(--clay-button);
+}
+:global([data-theme='claymorphism-light']) .rootTarget {
+  border-radius: 16px;
+}

@@ -70,7 +70,7 @@ flowchart LR
 
 ## 换一种光线，继续专注
 
-顶部「界面风格」可选择晨光玻璃、夜色玻璃和新粗野主义。玻璃保持柔和材质与可调宽度；新粗野主义使用粗黑边、硬阴影、鲜艳色块与独立详情浮层。编辑区域或弹窗打开、拖拽与保存期间暂不可切换，请先完成编辑并关闭区域。每天显示的时间范围也可以调整。
+顶部「界面风格」可选择晨光玻璃、夜色玻璃、新粗野主义和黏土拟态（Claymorphism）。玻璃保持柔和材质与可调宽度；新粗野主义使用粗黑边、硬阴影、鲜艳色块与独立详情浮层。编辑区域或弹窗打开、拖拽与保存期间暂不可切换，请先完成编辑并关闭区域。每天显示的时间范围也可以调整。黏土拟态采用浅紫与柔粉、大圆角、内高光和柔软立体阴影，使用固定任务栏与详情浮层，并保留紧凑待办列表；目前提供浅色版本。
 
 ![留白深色工作台：相同任务与排期在深色主题下的展示](docs/images/workbench-dark.png)
 
@@ -100,8 +100,10 @@ npm start
 
 ## 多风格界面维护
 
+v0.8.0 / claymorphism-theme：[功能计划](docs/plans/v0.8.0_claymorphism-theme_functional-plan.md) · [技术方案](docs/plans/v0.8.0_claymorphism-theme_technical-plan.md)。
+
 v0.6.0 / neobrutalism-theme：[功能计划](docs/plans/v0.6.0_neobrutalism-theme_functional-plan.md) · [技术方案](docs/plans/v0.6.0_neobrutalism-theme_technical-plan.md)。
 
-`src/client/presentations/glass` 与 `neobrutalism` 分别维护页面入口、布局、配色和样式；同族深浅玻璃共享页面。`application/useWorkbench` 管理公共数据与操作，`App` 负责装配。共享控件通过 `Appearance` 获取样式，可由新的界面选择复用或替换，不得互相导入其他风格的页面或 CSS。
+`src/client/presentations/glass`、`neobrutalism` 与 `claymorphism` 分别维护页面入口、布局、配色和样式；同族深浅玻璃共享页面。`application/useWorkbench` 管理公共数据与操作，`App` 负责装配。共享控件通过 `Appearance` 获取样式，可由新的界面选择复用或替换，不得互相导入其他风格的页面或 CSS。
 
 新增风格应在自己的目录实现界面与样式，在装配入口和主题注册表登记，并扩展当前偏好类型与校验；不要修改冻结的历史校验。执行公共功能测试、风格依赖隔离与样式契约测试，并分别验收所有界面的主要流程。当前编辑草稿保留在控件内，因此切换前必须关闭编辑区域；不会自动跨不同界面迁移未保存表单。

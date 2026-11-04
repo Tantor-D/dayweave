@@ -1,3 +1,4 @@
+import { definitions as claymorphism } from './presentations/claymorphism/themes';
 import { definitions as glass } from './presentations/glass/themes';
 import { definitions as neobrutalism } from './presentations/neobrutalism/themes';
 import {
@@ -13,7 +14,7 @@ export interface CardAppearanceProps {
   children: ReactNode;
 }
 export interface ThemeDefinition {
-  id: 'glass-light' | 'glass-dark' | 'neobrutalism-light';
+  id: 'glass-light' | 'glass-dark' | 'neobrutalism-light' | 'claymorphism-light';
   mode: 'light' | 'dark';
   label: string;
   tokens: Record<string, string>;
@@ -32,5 +33,9 @@ export function ThemeCard(props: CardAppearanceProps) {
   const Card = themes[id].CardAppearance ?? DefaultCard;
   return <Card {...props} />;
 }
-export const themes: Record<ThemeDefinition['id'], ThemeDefinition> = { ...glass, ...neobrutalism };
+export const themes: Record<ThemeDefinition['id'], ThemeDefinition> = {
+  ...glass,
+  ...neobrutalism,
+  ...claymorphism,
+};
 export const themeStyle = (id: ThemeDefinition['id']) => themes[id].tokens as CSSProperties;
