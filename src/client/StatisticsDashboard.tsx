@@ -8,7 +8,7 @@ import {
   type StatisticsDay,
 } from '../domain/statistics';
 import type { StatisticsPreferences, Workspace } from '../domain/types';
-import s from './StatisticsDashboard.module.css';
+import { useAppearance } from './presentations/Appearance';
 
 const hours = (minutes: number | null) =>
   minutes === null
@@ -42,6 +42,7 @@ function Card({
   children: ReactNode;
   wide?: boolean;
 }) {
+  const { statistics: s } = useAppearance();
   return (
     <section className={`${s.card} ${wide ? s.wide : ''}`} data-chart={title}>
       <div className={s.cardHeading} title={description}>
@@ -61,6 +62,7 @@ function StatisticsDialog({
   children: ReactNode;
   close: () => void;
 }) {
+  const { statistics: s } = useAppearance();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current!;
@@ -81,6 +83,7 @@ function StatisticsDialog({
 }
 
 function Empty({ children = '这段时间还没有投入记录' }: { children?: ReactNode }) {
+  const { statistics: s } = useAppearance();
   return <div className={s.empty}>{children}</div>;
 }
 
@@ -110,6 +113,7 @@ function DailyChart({
   days: StatisticsDay[];
   mode: 'duration' | 'first' | 'personal' | 'selectedTag';
 }) {
+  const { statistics: s } = useAppearance();
   const [focused, setFocused] = useState<string | null>(null);
   const { ref: chartRef, width, height } = useChartSize();
   const plotHeight = Math.max(10, height - 40);
@@ -258,6 +262,7 @@ const trendMetrics = {
 } as const;
 type TrendMetric = keyof typeof trendMetrics;
 function TrendChart({ days }: { days: StatisticsDay[] }) {
+  const { statistics: s } = useAppearance();
   const [metric, setMetric] = useState<TrendMetric>('work');
   const [focused, setFocused] = useState<string | null>(null);
   const { ref: chartRef, width, height } = useChartSize();
@@ -393,14 +398,17 @@ function TrendChart({ days }: { days: StatisticsDay[] }) {
 }
 
 export function StatisticsDashboard({
+  onEditingChange,
   workspace,
   preferences,
   update,
 }: {
   workspace: Workspace;
+  onEditingChange: (editing: boolean) => void;
   preferences: StatisticsPreferences;
   update: (value: StatisticsPreferences) => Promise<boolean>;
 }) {
+  const { statistics: s } = useAppearance();
   const [now, setNow] = useState(Date.now());
   const [popup, setPopup] = useState<'config' | 'method' | 'dates' | 'details' | null>(null);
   const [group, setGroup] = useState(0);
@@ -411,6 +419,10 @@ export function StatisticsDashboard({
   const [draftEnd, setDraftEnd] = useState(range.endDate);
   const [rangeError, setRangeError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  useEffect(() => {
+    onEditingChange(!!popup || !!expanded);
+    return () => onEditingChange(false);
+  }, [popup, expanded, onEditingChange]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);

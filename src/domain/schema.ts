@@ -129,7 +129,7 @@ export const statisticsPreferencesSchema = z
   );
 export const preferencesSchema = z.strictObject({
   statistics: statisticsPreferencesSchema,
-  theme: z.enum(['glass-light', 'glass-dark']),
+  theme: z.enum(['glass-light', 'glass-dark', 'neobrutalism-light']),
   days: z.union([z.literal(1), z.literal(3), z.literal(7)]),
   orientation: z.enum(['vertical', 'horizontal']),
   panelWidth: z.number().min(200).max(700),

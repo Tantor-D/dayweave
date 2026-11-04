@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import s from './App.module.css';
+import { useAppearance } from './presentations/Appearance';
 export interface TagConfirmation {
   title: string;
   count: number;
@@ -14,6 +14,7 @@ export function TagPropagationDialog({
   request: TagConfirmation;
   onAnswer: (answer: boolean | null) => void;
 }) {
+  const { controls: s } = useAppearance();
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const el = dialog.current!;

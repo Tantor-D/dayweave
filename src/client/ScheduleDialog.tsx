@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CalendarPlus, LoaderCircle, Search, X } from 'lucide-react';
 import type { Operation, Placement, Workspace } from '../domain/types';
 import { dateOf, localInput, localToUTC } from './time';
-import s from './App.module.css';
+import { useAppearance } from './presentations/Appearance';
 
 export function ScheduleDialog({
   workspace,
@@ -17,6 +17,7 @@ export function ScheduleDialog({
   onSave: (operations: Operation[], reportError: (message: string) => void) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const { controls: s } = useAppearance();
   const dialog = useRef<HTMLDialogElement>(null);
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [draft, setDraft] = useState(emptyTaskDraft);

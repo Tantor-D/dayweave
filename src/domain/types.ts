@@ -122,7 +122,7 @@ export interface StatisticsPreferences {
 }
 export interface Preferences {
   statistics: StatisticsPreferences;
-  theme: 'glass-light' | 'glass-dark';
+  theme: 'glass-light' | 'glass-dark' | 'neobrutalism-light';
   days: 1 | 3 | 7;
   orientation: 'vertical' | 'horizontal';
   panelWidth: number;

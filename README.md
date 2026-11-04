@@ -70,7 +70,7 @@ flowchart LR
 
 ## 换一种光线，继续专注
 
-浅色与深色主题一键切换，面板宽度和每天显示的时间范围也可以调整，让工作台适合你的节奏。
+顶部「界面风格」可选择晨光玻璃、夜色玻璃和新粗野主义。玻璃保持柔和材质与可调宽度；新粗野主义使用粗黑边、硬阴影、鲜艳色块与独立详情浮层。编辑区域或弹窗打开、拖拽与保存期间暂不可切换，请先完成编辑并关闭区域。每天显示的时间范围也可以调整。
 
 ![留白深色工作台：相同任务与排期在深色主题下的展示](docs/images/workbench-dark.png)
 
@@ -96,4 +96,12 @@ npm start
 | 与 AI 协作、命令和确认规则 | [AI 协作指南](docs/AI-USAGE.md) |
 | 备份、历史恢复与外部文件修改 | [数据维护](docs/USER-GUIDE.md#文件备份与恢复) |
 | 本地开发与启动配置 | [启动与开发](docs/USER-GUIDE.md#启动与开发) |
-| 当前版本的功能与工程设计 | [v0.5.0 功能计划](docs/plans/v0.5.0_cli-ai-workflow_functional-plan.md) · [代码开发方案](docs/plans/v0.5.0_cli-ai-workflow_technical-plan.md) |
+| CLI AI 工作流设计 | [v0.5.0 功能计划](docs/plans/v0.5.0_cli-ai-workflow_functional-plan.md) · [代码开发方案](docs/plans/v0.5.0_cli-ai-workflow_technical-plan.md) |
+
+## 多风格界面维护
+
+v0.6.0 / neobrutalism-theme：[功能计划](docs/plans/v0.6.0_neobrutalism-theme_functional-plan.md) · [技术方案](docs/plans/v0.6.0_neobrutalism-theme_technical-plan.md)。
+
+`src/client/presentations/glass` 与 `neobrutalism` 分别维护页面入口、布局、配色和样式；同族深浅玻璃共享页面。`application/useWorkbench` 管理公共数据与操作，`App` 负责装配。共享控件通过 `Appearance` 获取样式，可由新的界面选择复用或替换，不得互相导入其他风格的页面或 CSS。
+
+新增风格应在自己的目录实现界面与样式，在装配入口和主题注册表登记，并扩展当前偏好类型与校验；不要修改冻结的历史校验。执行公共功能测试、风格依赖隔离与样式契约测试，并分别验收所有界面的主要流程。当前编辑草稿保留在控件内，因此切换前必须关闭编辑区域；不会自动跨不同界面迁移未保存表单。

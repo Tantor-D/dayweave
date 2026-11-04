@@ -312,6 +312,21 @@ test('preferences remain durable without model settings', async (t) => {
   assert.equal((await f.store.getPreferences()).theme, 'glass-dark');
   assert.deepEqual((await f.store.getPreferences()).hiddenTags, ['personal']);
 });
+test('all presentation choices persist without changing workspace or other preferences', async (t) => {
+  const f = await fixture(t);
+  const before = await f.store.read('workspace');
+  await f.store.updatePreferences({ panelWidth: 330, days: 7 });
+  for (const theme of ['neobrutalism-light', 'glass-light', 'glass-dark'] as const) {
+    await f.store.updatePreferences({ theme });
+    await f.restart();
+    const preferences = await f.store.getPreferences();
+    assert.equal(preferences.theme, theme);
+    assert.equal(preferences.panelWidth, 330);
+    assert.equal(preferences.days, 7);
+    assert.equal((await f.store.read('workspace')).hash, before.hash);
+  }
+  await assert.rejects(f.store.updatePreferences({ theme: 'unknown-style' } as any));
+});
 test('exclusive lock rejects second process instance and releases on close', async (t) => {
   const f = await fixture(t);
   await assert.rejects(Store.open(f.options), /已有运行中的服务/);

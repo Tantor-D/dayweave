@@ -31,7 +31,7 @@ import type {
 } from '../domain/types';
 import { api, commit, readDocument } from './api';
 import { clockLabel, localInput, localToUTC, today } from './time';
-import s from './App.module.css';
+import { useAppearance } from './presentations/Appearance';
 export const statusLabels = { todo: '未完成', done: '已完成' };
 export type Save = (operations: Operation[], summary: string) => Promise<boolean>;
 export type Notify = (message: string, error?: boolean) => void;
@@ -52,6 +52,7 @@ export function TaskDetail({
   save: Save;
   notify: Notify;
 }) {
+  const { controls: s } = useAppearance();
   const [draft, setDraft] = useState(task);
   const [busy, setBusy] = useState(false);
   useEffect(() => setDraft(task), [task.id, task.updatedAt]);
@@ -180,6 +181,7 @@ function PlacementEditor({
   save: Save;
   notify: Notify;
 }) {
+  const { controls: s } = useAppearance();
   const [open, setOpen] = useState(false),
     [kind, setKind] = useState<'day' | 'timed'>(placement?.kind ?? 'day'),
     [date, setDate] = useState(placement?.kind === 'day' ? placement.date : today()),
@@ -315,6 +317,7 @@ export function FilterPanel({
   preferences: Preferences;
   update: (patch: Partial<Preferences>) => void;
 }) {
+  const { controls: s } = useAppearance();
   const toggle = (key: 'hiddenTags' | 'hiddenTasks' | 'hiddenStatuses', id: string) =>
     update({
       [key]: (preferences[key] as string[]).includes(id)
@@ -379,6 +382,7 @@ export function FilterPanel({
   );
 }
 export function OrganizationPanel({ workspace, save }: PanelProps) {
+  const { controls: s } = useAppearance();
   const [name, setName] = useState('');
   const [color, setColor] = useState('#537fc5');
   const [busy, setBusy] = useState(false);
@@ -515,6 +519,7 @@ function TagEditor({
   save: Save;
   busy: boolean;
 }) {
+  const { controls: s } = useAppearance();
   const [name, setName] = useState(tag.name);
   const [menu, setMenu] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -653,6 +658,7 @@ export function DocumentEditor({
   notify: Notify;
   onSaved?: () => void;
 }) {
+  const { controls: s } = useAppearance();
   const [snapshot, setSnapshot] = useState<Snapshot<string>>(),
     [text, setText] = useState(''),
     [busy, setBusy] = useState(false),
@@ -764,6 +770,7 @@ export function DocumentEditor({
   );
 }
 export function BackgroundPanel({ notify }: { notify: Notify }) {
+  const { controls: s } = useAppearance();
   return (
     <div className={s.panelContent}>
       <h2>让 AI 了解你的节奏</h2>
@@ -774,6 +781,7 @@ export function BackgroundPanel({ notify }: { notify: Notify }) {
   );
 }
 export function ReviewPanel({ notify, workspace }: { notify: Notify; workspace: Workspace }) {
+  const { controls: s } = useAppearance();
   const [date, setDate] = useState(today()),
     [review, setReview] = useState<{
       planned: Task[];
@@ -890,6 +898,7 @@ export function ReviewPanel({ notify, workspace }: { notify: Notify; workspace: 
   );
 }
 export function DiffViewer({ before, after }: { before: string | null; after: string }) {
+  const { controls: s } = useAppearance();
   return (
     <div className={s.diff}>
       <details open>
@@ -912,6 +921,7 @@ export function ExternalNotice({
   reload: () => Promise<unknown>;
   notify: Notify;
 }) {
+  const { controls: s } = useAppearance();
   const [show, setShow] = useState(false);
   const external = snapshot.external;
   if (!external) return null;
@@ -959,6 +969,7 @@ export function HistoryPanel({
   notify: Notify;
   refresh: () => Promise<void>;
 }) {
+  const { controls: s } = useAppearance();
   const [allChanges, setChanges] = useState<Change[]>([]),
     [target, setTarget] = useState(''),
     [selected, setSelected] = useState<Change>(),
@@ -1111,6 +1122,7 @@ export function SettingsPanel({
   preferences: Preferences;
   updatePreferences: (patch: Partial<Preferences>) => Promise<boolean>;
 }) {
+  const { controls: s } = useAppearance();
   return (
     <div className={s.panelContent}>
       <h2>工作台设置</h2>
@@ -1127,6 +1139,7 @@ export function ProposalsPanel({
   refresh: () => Promise<void>;
   notify: Notify;
 }) {
+  const { controls: s } = useAppearance();
   const [open, setOpen] = useState<string>(),
     [busy, setBusy] = useState(false);
   const act = async (p: Proposal, action: 'confirm' | 'reject' | 'submit') => {
@@ -1212,6 +1225,7 @@ function WorkbenchSettings({
   preferences: Preferences;
   update: (patch: Partial<Preferences>) => Promise<boolean>;
 }) {
+  const { controls: s } = useAppearance();
   const [start, setStart] = useState(minuteLabel(preferences.dayStart));
   const [end, setEnd] = useState(minuteLabel(preferences.dayEnd));
   const [inherit, setInherit] = useState(preferences.inheritParentTags);

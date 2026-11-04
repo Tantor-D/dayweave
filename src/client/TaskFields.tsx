@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useId } from 'react';
 import type { Task, Workspace } from '../domain/types';
 import { ancestors, taskPath, treeOrder } from '../domain/tree';
-import s from './App.module.css';
+import { useAppearance } from './presentations/Appearance';
 
 export const InheritTagsContext = createContext(true);
 
@@ -23,6 +23,7 @@ export function TaskFields({
   onChange: (value: TaskDraft) => void;
   taskId?: string;
 }) {
+  const { controls: s } = useAppearance();
   const listId = useId();
   const inherit = useContext(InheritTagsContext);
   const [query, setQuery] = useState('');
