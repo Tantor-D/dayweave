@@ -1,3 +1,4 @@
+import type { NeumorphismSettings } from './neumorphism';
 export type Source = 'user' | 'web_ai' | 'harness' | 'external';
 export type Target =
   'workspace' | 'long-term' | 'short-term' | `daily/${string}` | `notes/${string}`;
@@ -121,8 +122,9 @@ export interface StatisticsPreferences {
   hiddenCharts: ('trend' | 'duration' | 'first' | 'parallel' | 'tags' | 'selectedTag')[];
 }
 export interface Preferences {
+  neumorphism?: NeumorphismSettings;
   statistics: StatisticsPreferences;
-  theme: 'glass-light' | 'glass-dark' | 'neobrutalism-light' | 'claymorphism-light';
+  theme: 'glass-light' | 'glass-dark' | 'neobrutalism-light' | 'claymorphism-light' | 'neumorphism-light';
   days: 1 | 3 | 7;
   orientation: 'vertical' | 'horizontal';
   panelWidth: number;

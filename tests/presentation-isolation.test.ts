@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-const families = ['glass', 'neobrutalism', 'claymorphism'];
+const families = ['glass', 'neobrutalism', 'claymorphism', 'neumorphism'];
 const client = new URL('../src/client/', import.meta.url).pathname;
 async function sources(path: string): Promise<string[]> {
   const entries = await readdir(path, { withFileTypes: true });
@@ -35,7 +35,7 @@ test('presentation families never import one another; shared controls do not imp
     const content = await readFile(join(client, file), 'utf8');
     assert.doesNotMatch(
       content,
-      /from ['"][^'"]*presentations\/(glass|neobrutalism|claymorphism)\//,
+      /from ['"][^'"]*presentations\/(glass|neobrutalism|claymorphism|neumorphism)\//,
       file,
     );
   }

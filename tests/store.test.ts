@@ -316,7 +316,7 @@ test('all presentation choices persist without changing workspace or other prefe
   const f = await fixture(t);
   const before = await f.store.read('workspace');
   await f.store.updatePreferences({ panelWidth: 330, days: 7 });
-  for (const theme of ['neobrutalism-light', 'glass-light', 'glass-dark', 'claymorphism-light'] as const) {
+  for (const theme of ['neobrutalism-light', 'glass-light', 'glass-dark', 'claymorphism-light', 'neumorphism-light'] as const) {
     await f.store.updatePreferences({ theme });
     await f.restart();
     const preferences = await f.store.getPreferences();

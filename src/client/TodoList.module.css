@@ -228,3 +228,34 @@
 :global([data-theme='claymorphism-light']) .rootTarget {
   border-radius: 16px;
 }
+
+/* Neumorphism changes the material while retaining the shared list's compact geometry. */
+:global([data-theme='neumorphism-light']) .group {
+  border-color: transparent;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+:global([data-theme='neumorphism-light']) .page button {
+  border-color: transparent;
+  border-radius: var(--radius);
+  box-shadow: var(--neu-soft);
+}
+:global([data-theme='neumorphism-light']) .page .title,
+:global([data-theme='neumorphism-light']) .page .groupTitle {
+  background: transparent;
+  box-shadow: none;
+  border-radius: var(--radius);
+}
+:global([data-theme='neumorphism-light']) .page input:not([type='checkbox']) {
+  border-color: transparent;
+  border-radius: var(--radius);
+  box-shadow: var(--neu-inset);
+}
+:global([data-theme='neumorphism-light']) .presets [aria-pressed='true'] {
+  background: var(--accent-soft);
+  box-shadow: var(--neu-inset);
+}
+:global([data-theme='neumorphism-light']) .rootTarget {
+  border-radius: var(--radius);
+}

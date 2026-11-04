@@ -107,3 +107,11 @@ v0.6.0 / neobrutalism-theme：[功能计划](docs/plans/v0.6.0_neobrutalism-them
 `src/client/presentations/glass`、`neobrutalism` 与 `claymorphism` 分别维护页面入口、布局、配色和样式；同族深浅玻璃共享页面。`application/useWorkbench` 管理公共数据与操作，`App` 负责装配。共享控件通过 `Appearance` 获取样式，可由新的界面选择复用或替换，不得互相导入其他风格的页面或 CSS。
 
 新增风格应在自己的目录实现界面与样式，在装配入口和主题注册表登记，并扩展当前偏好类型与校验；不要修改冻结的历史校验。执行公共功能测试、风格依赖隔离与样式契约测试，并分别验收所有界面的主要流程。当前编辑草稿保留在控件内，因此切换前必须关闭编辑区域；不会自动跨不同界面迁移未保存表单。
+
+## 柔光拟态与外观配置
+
+v0.9.0 / neumorphism-theme：[功能计划](docs/plans/v0.9.0_neumorphism-theme_functional-plan.md) · [技术方案](docs/plans/v0.9.0_neumorphism-theme_technical-plan.md)。
+
+选择「柔光拟态 Neumorphism」后，点击主题选择器旁的「拟态设置」，在右侧抽屉调整底色、强调色、圆角、凸起距离、阴影强度、柔和度和光源方向。修改实时预览，点击保存后刷新仍保留；取消、关闭或 Escape 恢复打开前外观。「恢复默认」先预览，保存后生效。窄窗口下抽屉全宽显示，编辑任务或保存期间不可打开。
+
+新风格独立位于 `src/client/presentations/neumorphism`，配置沿用偏好文件保存，不改变任务数据。底色限定浅色，各 RGB 通道至少为 180；其他参数具有范围限制。

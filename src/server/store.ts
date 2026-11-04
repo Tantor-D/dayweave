@@ -1,3 +1,4 @@
+import { defaultNeumorphism } from '../domain/neumorphism.ts';
 import { defaultStatistics } from '../domain/statistics.ts';
 import { legacyPreferencesSchema } from '../domain/legacy.ts';
 import { createHash, randomUUID } from 'node:crypto';
@@ -35,6 +36,7 @@ interface StoreOptions {
 }
 const defaults: Preferences = {
   statistics: structuredClone(defaultStatistics),
+  neumorphism: { ...defaultNeumorphism },
   theme: 'glass-light',
   days: 3,
   orientation: 'vertical',
@@ -871,6 +873,7 @@ function parsePreferences(value: Record<string, unknown>): Preferences {
     coded('INVALID_PREFERENCES', '状态筛选无效');
   const p = preferencesSchema.parse({
     statistics: structuredClone(defaultStatistics),
+    neumorphism: { ...defaultNeumorphism },
     dayStart: 0,
     dayEnd: 1440,
     inheritParentTags: true,

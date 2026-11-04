@@ -2,9 +2,16 @@ import { useState } from 'react';
 import type { Workbench } from '../application/useWorkbench';
 import type { ThemeDefinition } from '../themes';
 import { themes } from '../themes';
-export function ThemePicker({ workbench: w }: { workbench: Workbench }) {
+export function ThemePicker({
+  workbench: w,
+  extraLocked = false,
+}: {
+  workbench: Workbench;
+  extraLocked?: boolean;
+}) {
   const [saving, setSaving] = useState(false);
   const locked =
+    extraLocked ||
     saving ||
     w.statisticsEditing ||
     w.todoEditing ||

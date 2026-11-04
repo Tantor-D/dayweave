@@ -1,3 +1,4 @@
+import { isLightSurface } from './neumorphism.ts';
 import { validStatisticsDate } from './statistics.ts';
 import { z } from 'zod';
 import type { Target } from './types.ts';
@@ -127,9 +128,19 @@ export const statisticsPreferencesSchema = z
       (p.startDate !== null && p.endDate !== null && p.startDate <= p.endDate),
     '请选择有效的起止日期',
   );
+export const neumorphismSchema = z.strictObject({
+  background: z.string().refine(isLightSurface, '底色各 RGB 通道须至少为 180，请选择浅色'),
+  accent: z.string().regex(/^#[0-9a-f]{6}$/i),
+  radius: z.number().int().min(8).max(32),
+  distance: z.number().int().min(2).max(12),
+  intensity: z.number().min(0.05).max(0.25),
+  blur: z.number().int().min(6).max(36),
+  light: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']),
+});
 export const preferencesSchema = z.strictObject({
   statistics: statisticsPreferencesSchema,
-  theme: z.enum(['glass-light', 'glass-dark', 'neobrutalism-light', 'claymorphism-light']),
+  neumorphism: neumorphismSchema.optional(),
+  theme: z.enum(['glass-light', 'glass-dark', 'neobrutalism-light', 'claymorphism-light', 'neumorphism-light']),
   days: z.union([z.literal(1), z.literal(3), z.literal(7)]),
   orientation: z.enum(['vertical', 'horizontal']),
   panelWidth: z.number().min(200).max(700),
