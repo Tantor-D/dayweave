@@ -38,8 +38,9 @@ type Panel =
   | 'organization'
   | 'proposals';
 export function useWorkbench() {
+  const [todoEditing, setTodoEditing] = useState(false);
   const [statisticsEditing, setStatisticsEditing] = useState(false);
-  const [view, setView] = useState<'workbench' | 'statistics'>('workbench');
+  const [view, setView] = useState<'workbench' | 'statistics' | 'todo'>('workbench');
   const [snapshot, setSnapshot] = useState<Snapshot<Workspace>>(),
     [preferences, setPreferences] = useState(initialPreferences),
     [proposals, setProposals] = useState<Proposal[]>([]),
@@ -281,6 +282,8 @@ export function useWorkbench() {
     );
   };
   return {
+    todoEditing,
+    setTodoEditing,
     statisticsEditing,
     setStatisticsEditing,
     view,

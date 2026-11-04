@@ -1,3 +1,4 @@
+import { TodoList } from '../../TodoList';
 import { usePanelResize } from './usePanelResize';
 import { StatisticsDashboard } from '../../StatisticsDashboard';
 import statisticsStyles from './Statistics.module.css';
@@ -16,6 +17,7 @@ import {
   Filter,
   Folder,
   History,
+  ListTodo,
   Plus,
   Search,
   Settings,
@@ -173,6 +175,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
             </div>
             <nav className={s.headerActions}>
               <button
+                disabled={workbench.todoEditing}
                 aria-pressed={view === 'workbench'}
                 className={view === 'workbench' ? s.active : ''}
                 onClick={() => setView('workbench')}
@@ -181,6 +184,15 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                 工作台
               </button>
               <button
+                aria-pressed={view === 'todo'}
+                className={view === 'todo' ? s.active : ''}
+                onClick={() => setView('todo')}
+              >
+                <ListTodo size={16} />
+                待办
+              </button>
+              <button
+                disabled={workbench.todoEditing}
                 aria-pressed={view === 'statistics'}
                 className={view === 'statistics' ? s.active : ''}
                 onClick={() => setView('statistics')}
@@ -190,9 +202,10 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               </button>
               <button
                 className={panel === 'background' ? s.active : ''}
+                disabled={workbench.todoEditing}
                 onClick={() => {
                   setView('workbench');
-                  if (view === 'statistics') setPanel('background');
+                  if (view !== 'workbench') setPanel('background');
                   else togglePanel('background');
                 }}
               >
@@ -201,9 +214,10 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               </button>
               <button
                 className={panel === 'review' ? s.active : ''}
+                disabled={workbench.todoEditing}
                 onClick={() => {
                   setView('workbench');
-                  if (view === 'statistics') setPanel('review');
+                  if (view !== 'workbench') setPanel('review');
                   else togglePanel('review');
                 }}
               >
@@ -213,9 +227,10 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               <button
                 aria-label="修改历史"
                 title="修改历史"
+                disabled={workbench.todoEditing}
                 onClick={() => {
                   setView('workbench');
-                  if (view === 'statistics') setPanel('history');
+                  if (view !== 'workbench') setPanel('history');
                   else togglePanel('history');
                 }}
               >
@@ -225,9 +240,10 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               <button
                 aria-label="设置"
                 title="设置"
+                disabled={workbench.todoEditing}
                 onClick={() => {
                   setView('workbench');
-                  if (view === 'statistics') setPanel('settings');
+                  if (view !== 'workbench') setPanel('settings');
                   else togglePanel('settings');
                 }}
               >
@@ -250,6 +266,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               {snapshot?.external && (
                 <ExternalNotice snapshot={snapshot} reload={refresh} notify={notify} />
               )}
+              {view === 'todo' && <TodoList workbench={workbench} />}
               {view === 'statistics' && (
                 <StatisticsDashboard
                   onEditingChange={workbench.setStatisticsEditing}
@@ -259,7 +276,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                 />
               )}
               <ViewLayout
-                className={`${s.layout} ${view === 'statistics' ? statisticsStyles.hiddenWorkbench : ''}`}
+                className={`${s.layout} ${view !== 'workbench' ? statisticsStyles.hiddenWorkbench : ''}`}
                 panelWidth={panelWidth}
                 sidebar={
                   <aside className={s.sidebar}>

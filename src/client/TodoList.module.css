@@ -1,0 +1,199 @@
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px clamp(18px, 4vw, 64px) 48px;
+  color: var(--text);
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.heading h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+}
+.heading p,
+.empty,
+.name small {
+  color: var(--muted);
+  font-size: 13px;
+}
+.page button,
+.page select,
+.page input:not([type='checkbox']) {
+  font: inherit;
+  color: var(--text);
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+.page button {
+  cursor: pointer;
+}
+.page button:disabled,
+.page input:disabled,
+.page select:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.page :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin: 22px 0;
+}
+.toolbar label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.presets {
+  display: flex;
+  gap: 4px;
+}
+.presets [aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.group {
+  margin: 16px 0;
+  padding: 16px 20px;
+  background: var(--input);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.group h2,
+.groupTitle {
+  font-size: 17px !important;
+  font-weight: 650;
+  margin: 0 0 8px;
+}
+.page .groupTitle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.group h2 span,
+.groupTitle span {
+  color: var(--muted);
+  font-size: 13px;
+  margin-left: 8px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.grip {
+  cursor: grab;
+  color: var(--muted);
+  padding: 8px 2px;
+}
+.page .row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.name {
+  flex: 1;
+  min-width: 100px;
+}
+.page .title {
+  background: transparent;
+  border: 0;
+  padding: 3px 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.name small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.name form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.name form input {
+  flex: 1;
+}
+.done .title {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.page .row select {
+  width: 140px;
+  font-size: 12px;
+}
+.page .date {
+  width: 145px;
+  font-size: 12px;
+}
+.empty {
+  min-height: 18px;
+  margin: 8px 0 0;
+}
+.rootTarget,
+.parentTarget {
+  padding: 12px;
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.hover {
+  outline: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+:global([data-theme='neobrutalism-light']) .group {
+  border: 2px solid var(--text);
+  border-radius: 4px;
+  box-shadow: 3px 3px 0 var(--text);
+}
+@media (max-width: 900px) {
+  .row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .name {
+    flex-basis: calc(100% - 68px);
+  }
+  .row .date {
+    margin-left: 46px;
+  }
+  .page .row select {
+    flex: 1;
+  }
+  .group {
+    padding: 14px;
+  }
+}
+
+.page .toolbar input[type='search'] {
+  width: 240px;
+}
+.parentTarget {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 8px;
+  color: var(--muted);
+}
+.page .row .date {
+  flex-shrink: 0;
+}

@@ -7,6 +7,7 @@ export function ThemePicker({ workbench: w }: { workbench: Workbench }) {
   const locked =
     saving ||
     w.statisticsEditing ||
+    w.todoEditing ||
     w.busy ||
     !!w.panel ||
     w.newTask ||
