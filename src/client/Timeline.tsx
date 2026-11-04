@@ -5,11 +5,12 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Check, GripVertical } from 'lucide-react';
+import { Check, ChevronRight, GripVertical } from 'lucide-react';
 import { taskColor } from '../domain/tags';
 import { ancestors } from '../domain/tree';
 import type { Operation, Placement, Task, Tag } from '../domain/types';
 import {
+  dayTaskRows,
   atMinute,
   clockLabel,
   selectedRange,
@@ -37,6 +38,8 @@ interface DragState {
   offset: number;
   preview?: Placement;
   parentTarget?: { id: string; title: string };
+  rootTarget?: boolean;
+  sortTarget?: { id: string; title: string; side: 'before' | 'after' };
 }
 export function useScheduleDrag(
   save: (ops: Operation[], summary: string) => Promise<unknown>,
@@ -96,14 +99,32 @@ export function useScheduleDrag(
       event.preventDefault();
       const el = document
         .elementFromPoint(event.clientX, event.clientY)
-        ?.closest('[data-time-date],[data-day-date],[data-task-drop]') as HTMLElement | null;
+        ?.closest(
+          '[data-time-date],[data-day-date],[data-task-drop],[data-root-drop]',
+        ) as HTMLElement | null;
+      const rootTarget =
+        !previous.original && !!previous.task.parentId && el?.dataset.rootDrop !== undefined;
       let preview: Placement | undefined;
       const target = tasksRef.current.find((t) => t.id === el?.dataset.taskDrop);
-      const parentTarget =
+      const rect = el?.getBoundingClientRect();
+      const position = rect ? (event.clientY - rect.top) / rect.height : 0.5;
+      const sortTarget =
         !previous.original &&
         target &&
         target.id !== previous.task.id &&
-        target.status !== 'done' &&
+        target.parentId === previous.task.parentId &&
+        (position < 0.25 || position > 0.75)
+          ? {
+              id: target.id,
+              title: target.title,
+              side: position < 0.25 ? ('before' as const) : ('after' as const),
+            }
+          : undefined;
+      const parentTarget =
+        !sortTarget &&
+        !previous.original &&
+        target &&
+        target.id !== previous.task.id &&
         !ancestors(target, tasksRef.current).some((t) => t.id === previous.task.id)
           ? { id: target.id, title: target.title }
           : undefined;
@@ -166,6 +187,8 @@ export function useScheduleDrag(
         y: event.clientY,
         preview,
         parentTarget,
+        rootTarget,
+        sortTarget,
       };
       latest.current = next;
       setDrag(next);
@@ -176,7 +199,30 @@ export function useScheduleDrag(
       setDrag(null);
       if (current?.moved) {
         suppressedUntil.current = Date.now() + 350;
-        if (current.parentTarget)
+        if (current.rootTarget) {
+          const order =
+            Math.max(-1, ...tasksRef.current.filter((t) => !t.parentId).map((t) => t.order)) + 1;
+          void dragSaveRef.current(
+            [{ type: 'task.update', id: current.task.id, patch: { parentId: null, order } }],
+            '设为一级任务',
+          );
+        } else if (current.sortTarget) {
+          const siblings = tasksRef.current
+            .filter((t) => t.parentId === current.task.parentId && t.id !== current.task.id)
+            .sort((a, b) => a.order - b.order);
+          const targetIndex = siblings.findIndex((t) => t.id === current.sortTarget!.id);
+          if (targetIndex >= 0) {
+            siblings.splice(
+              targetIndex + (current.sortTarget.side === 'after' ? 1 : 0),
+              0,
+              current.task,
+            );
+            void dragSaveRef.current(
+              siblings.map((t, order) => ({ type: 'task.update', id: t.id, patch: { order } })),
+              '调整同级任务顺序',
+            );
+          }
+        } else if (current.parentTarget)
           void dragSaveRef.current(
             [
               {
@@ -219,6 +265,7 @@ export function useScheduleDrag(
 }
 interface Props {
   tasks: Task[];
+  allTasks?: Task[];
   tags: Tag[];
   dayStart: number;
   dayEnd: number;
@@ -232,6 +279,7 @@ interface Props {
 }
 export function Timeline({
   tasks,
+  allTasks = tasks,
   tags,
   dayStart,
   dayEnd,
@@ -468,6 +516,8 @@ export function Timeline({
                     <DayDrop
                       date={date}
                       tasks={renderTasks}
+                      allTasks={allTasks}
+                      hierarchical
                       tags={tags}
                       onDrag={onDrag}
                       onSelect={onSelect}
@@ -544,13 +594,20 @@ export function Timeline({
       </div>
       {preview?.moved && (
         <div className={s.dragTip} style={{ left: preview.x + 16, top: preview.y + 16 }}>
-          {preview.parentTarget
-            ? '设为「' + preview.parentTarget.title + '」的子任务'
-            : preview.preview
-              ? preview.preview.kind === 'day'
-                ? `${preview.preview.date} · 未定时`
-                : `${clockLabel(preview.preview.startAt)} — ${clockLabel(preview.preview.endAt)}`
-              : '拖到日期或时间轴'}
+          {preview.rootTarget
+            ? '设为一级任务'
+            : preview.sortTarget
+              ? '移到「' +
+                preview.sortTarget.title +
+                '」' +
+                (preview.sortTarget.side === 'before' ? '前面' : '后面')
+              : preview.parentTarget
+                ? '设为「' + preview.parentTarget.title + '」的子任务'
+                : preview.preview
+                  ? preview.preview.kind === 'day'
+                    ? `${preview.preview.date} · 未定时`
+                    : `${clockLabel(preview.preview.startAt)} — ${clockLabel(preview.preview.endAt)}`
+                  : '拖到日期或时间轴'}
           <small>Esc 取消</small>
         </div>
       )}
@@ -698,6 +755,8 @@ function DayDrop({
   date,
   tags,
   tasks,
+  allTasks = tasks,
+  hierarchical = false,
   onDrag,
   onSelect,
   onSchedule,
@@ -705,10 +764,14 @@ function DayDrop({
   date: string;
   tags: Tag[];
   tasks: Task[];
+  allTasks?: Task[];
+  hierarchical?: boolean;
   onDrag: DragStart;
   onSelect: (id: string) => void;
   onSchedule: (placement: Placement) => void;
 }) {
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const rows = dayTaskRows(tasks, allTasks, date, expanded);
   const placements = tasks.flatMap((task) =>
     task.placements.filter((p) => p.kind === 'day' && p.date === date).map((p) => ({ task, p })),
   );
@@ -720,7 +783,7 @@ function DayDrop({
       role="group"
       tabIndex={0}
       onClick={(event) => {
-        if ((event.target as HTMLElement).closest('[data-placement]')) return;
+        if ((event.target as HTMLElement).closest('[data-placement], [data-day-task]')) return;
         event.currentTarget.focus({ preventScroll: true });
         onSchedule(placementAt(date));
       }}
@@ -731,24 +794,85 @@ function DayDrop({
         }
       }}
     >
-      {placements.map(({ task, p }) => (
-        <div
-          key={p.id}
-          data-placement={p.id}
-          role="button"
-          tabIndex={0}
-          style={{ '--task-color': taskColor(task, tags) ?? 'var(--accent)' } as CSSProperties}
-          className={`${s.dayChip} ${s.taskColor} ${task.status === 'done' ? s.done : ''}`}
-          onPointerDown={(e) => onDrag(e, task, p)}
-          onClick={() => onSelect(task.id)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onSelect(task.id);
-          }}
-        >
-          <GripVertical size={11} />
-          {task.title}
-        </div>
-      ))}
+      {hierarchical
+        ? rows.map(({ task, placement, depth, hasChildren }) => (
+            <div
+              key={task.id}
+              data-day-task={task.id}
+              className={s.dayTreeRow}
+              style={{ marginLeft: Math.min(depth, 6) * 10 }}
+            >
+              {hasChildren ? (
+                <button
+                  className={s.dayTreeToggle}
+                  aria-label={`${expanded.has(task.id) ? '收起' : '展开'} ${task.title}`}
+                  aria-expanded={expanded.has(task.id)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded((old) => {
+                      const next = new Set(old);
+                      if (next.has(task.id)) next.delete(task.id);
+                      else next.add(task.id);
+                      return next;
+                    });
+                  }}
+                >
+                  <ChevronRight
+                    size={13}
+                    style={{ transform: expanded.has(task.id) ? 'rotate(90deg)' : undefined }}
+                  />
+                </button>
+              ) : (
+                <span className={s.dayTreeSpacer} />
+              )}
+              <div
+                data-placement={placement?.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`${task.title}${placement ? '' : '（父任务）'}`}
+                title={placement ? task.title : `${task.title}（仅显示层级，未安排到当天）`}
+                className={`${s.dayChip} ${s.taskColor} ${!placement ? s.dayTreeContext : ''} ${task.status === 'done' ? s.done : ''}`}
+                style={
+                  { '--task-color': taskColor(task, tags) ?? 'var(--accent)' } as CSSProperties
+                }
+                onPointerDown={(e) => {
+                  if (placement) onDrag(e, task, placement);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(task.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.stopPropagation();
+                    onSelect(task.id);
+                  }
+                }}
+              >
+                {placement && <GripVertical size={11} />}
+                {task.title}
+              </div>
+            </div>
+          ))
+        : placements.map(({ task, p }) => (
+            <div
+              key={p.id}
+              data-placement={p.id}
+              role="button"
+              tabIndex={0}
+              style={{ '--task-color': taskColor(task, tags) ?? 'var(--accent)' } as CSSProperties}
+              className={`${s.dayChip} ${s.taskColor} ${task.status === 'done' ? s.done : ''}`}
+              onPointerDown={(e) => onDrag(e, task, p)}
+              onClick={() => onSelect(task.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onSelect(task.id);
+              }}
+            >
+              <GripVertical size={11} />
+              {task.title}
+            </div>
+          ))}
       <span className={s.dropHint}>＋ 仅安排日期</span>
     </div>
   );

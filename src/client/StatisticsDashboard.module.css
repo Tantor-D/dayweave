@@ -448,3 +448,352 @@
 main.hiddenWorkbench {
   display: none;
 }
+
+.trendToolbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.trendToolbar label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.trendToolbar select {
+  width: auto;
+  min-width: 150px;
+}
+.trendToolbar > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.trendLine {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  fill: none;
+}
+.trendDot {
+  fill: var(--solid);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+/* The dashboard fits the available workspace; detail content lives in dialogs. */
+.dashboard {
+  overflow: hidden;
+  padding: 12px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.toolbar {
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin: 0;
+  flex-shrink: 0;
+}
+.toolbar h1 {
+  font-size: 19px;
+  margin: 0 8px 0 0;
+}
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.dashboard button,
+.dashboard select,
+.dashboard input[type='date'] {
+  padding: 6px 9px;
+}
+.metrics {
+  gap: 10px;
+  flex-shrink: 0;
+}
+.metric {
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+.metric h2 {
+  margin: 0 0 5px;
+}
+.metric strong {
+  font-size: 26px;
+}
+.metric p {
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+.parallelMini {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.parallelMini > div {
+  height: 4px;
+  background: var(--accent);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+.parallelMini i {
+  display: block;
+  height: 100%;
+  background: #cc8b70;
+  margin-left: auto;
+}
+.grid {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 14px;
+}
+.wide {
+  grid-column: auto;
+}
+.cardHeading {
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+.cardHeading h2 {
+  font-size: 14px;
+}
+.cardHeading p {
+  display: none;
+}
+.chartScroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.chart {
+  height: 100%;
+  max-height: none;
+  overflow: hidden;
+}
+.chartReadout {
+  min-height: 16px;
+  height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  margin: 3px 0 0;
+  flex-shrink: 0;
+}
+.legend {
+  gap: 14px;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.trendToolbar {
+  margin: 0;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.trendToolbar label {
+  font-size: 11px;
+  gap: 6px;
+}
+.trendToolbar select {
+  min-width: 0;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+.trendToolbar > span {
+  font-size: 10px;
+}
+.tagSummary {
+  gap: 12px;
+  margin: 4px 0 0;
+  flex-wrap: nowrap;
+}
+.tagSummary strong {
+  font-size: 20px;
+}
+.tagSummary span {
+  font-size: 10px;
+}
+.tagSelect {
+  min-width: 0;
+  width: 100%;
+  font-size: 11px !important;
+  padding: 3px 6px !important;
+}
+.ranking {
+  max-height: none;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+}
+.rankRow {
+  grid-template-columns: minmax(60px, 1fr) 2fr 54px;
+  margin: 0;
+  gap: 8px;
+  font-size: 11px;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+}
+.pagination button {
+  font-size: 10px;
+  padding: 3px 6px;
+}
+.empty {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  display: grid;
+  place-content: center;
+  font-size: 12px;
+}
+.groupNav {
+  display: none;
+}
+.dialog {
+  color: var(--text);
+  background: var(--solid);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  width: min(1000px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+.dialog::backdrop {
+  background: rgb(0 0 0 / 35%);
+  backdrop-filter: blur(4px);
+}
+.dialog > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.dialog h2 {
+  font-size: 17px;
+  margin: 0;
+}
+.dialogBody {
+  overflow: auto;
+  max-height: calc(100dvh - 135px);
+}
+.dialog .card {
+  box-shadow: none;
+  border: none;
+  padding: 0;
+}
+.dialog .cardHeading {
+  display: none;
+}
+.dialog .method {
+  margin: 0;
+}
+.dialog .configuration {
+  gap: 16px;
+}
+.dialog .tableScroll th {
+  position: sticky;
+  top: 0;
+}
+@media (max-width: 1200px), (max-height: 650px) {
+  .metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .groupNav {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  .groupNav button {
+    font-size: 11px;
+  }
+  .groupNav button[aria-pressed='true'] {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .grid > .card {
+    display: none;
+  }
+  .grid[data-group='0'] > [data-chart='投入如何变化'],
+  .grid[data-group='1'] > [data-chart='每日投入'],
+  .grid[data-group='2'] > [data-chart='一天从何时开始'],
+  .grid[data-group='3'] > [data-chart='时间花在了哪里'],
+  .grid[data-group='4'] > [data-chart='留给自己的时间'],
+  .grid[data-group='5'] > [data-chart='关注一个标签'] {
+    display: flex;
+  }
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .rangeLabel {
+    font-size: 11px;
+  }
+}
+@media (max-width: 700px) {
+  .dashboard {
+    padding: 8px;
+    gap: 8px;
+  }
+  .metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .metric {
+    padding: 8px;
+  }
+  .metric strong {
+    font-size: 21px;
+  }
+  .metric p {
+    font-size: 9px;
+  }
+  .metric h2 {
+    font-size: 10px;
+  }
+  .parallelMini {
+    font-size: 9px;
+  }
+  .toolbar h1 {
+    font-size: 16px;
+  }
+  .presets button,
+  .actions button {
+    font-size: 11px;
+  }
+  .actions {
+    margin-left: 0;
+  }
+  .rangeLabel {
+    display: none;
+  }
+}
+.chart text {
+  font-size: 10px;
+}

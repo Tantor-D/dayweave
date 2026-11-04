@@ -117,7 +117,9 @@ export const statisticsPreferencesSchema = z
     startDate: statisticsDateSchema.nullable(),
     endDate: statisticsDateSchema.nullable(),
     tagId: idSchema.nullable(),
-    hiddenCharts: z.array(z.enum(['duration', 'first', 'parallel', 'tags', 'selectedTag'])),
+    hiddenCharts: z.array(
+      z.enum(['trend', 'duration', 'first', 'parallel', 'tags', 'selectedTag']),
+    ),
   })
   .refine(
     (p) =>

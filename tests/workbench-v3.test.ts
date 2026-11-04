@@ -204,3 +204,41 @@ test('removing a tag clears active and archived task references without removing
   validateWorkspace(w);
   assert.throws(() => run(w, [{ type: 'tag.remove', id: 'missing' }]));
 });
+
+test('moving unfinished task into completed branch reopens all ancestors', () => {
+  let w = run(emptyWorkspace(), [
+    { type: 'task.create', id: 'root', title: 'Root' },
+    { type: 'task.create', id: 'parent', title: 'Parent', parentId: 'root' },
+    { type: 'task.update', id: 'root', patch: { status: 'done' } },
+    { type: 'task.create', id: 'moving', title: 'Moving' },
+  ]);
+  w = run(w, [{ type: 'task.update', id: 'moving', patch: { parentId: 'parent' } }]);
+  for (const t of w.tasks) {
+    assert.equal(t.status, 'todo');
+    assert.equal(t.completedAt, null);
+  }
+});
+
+test('promoting a branch to root preserves its tags, placements and descendants', () => {
+  let w = run(emptyWorkspace(), [
+    { type: 'task.create', id: 'root', title: 'Root' },
+    { type: 'task.create', id: 'branch', title: 'Branch', parentId: 'root', tagIds: ['P1'] },
+    { type: 'task.create', id: 'leaf', title: 'Leaf', parentId: 'branch' },
+    {
+      type: 'placement.put',
+      taskId: 'branch',
+      placement: { id: 'day', kind: 'day', date: '2026-11-03' },
+    },
+  ]);
+  const branch = structuredClone(w.tasks.find((t) => t.id === 'branch')!);
+  const leaf = structuredClone(w.tasks.find((t) => t.id === 'leaf')!);
+  w = run(w, [{ type: 'task.update', id: 'branch', patch: { parentId: null, order: 10 } }]);
+  const promoted = w.tasks.find((t) => t.id === 'branch')!;
+  assert.equal(promoted.parentId, null);
+  assert.deepEqual(promoted.tagIds, branch.tagIds);
+  assert.deepEqual(promoted.placements, branch.placements);
+  assert.deepEqual(
+    w.tasks.find((t) => t.id === 'leaf'),
+    leaf,
+  );
+});

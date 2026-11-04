@@ -167,6 +167,10 @@ export function calculateStatistics(
     days,
     personalId,
     selectedTag,
+    untaggedMinutes:
+      duration(
+        union(records.filter(({ task }) => task.tagIds.length === 0).flatMap((r) => r.intervals)),
+      ) / MINUTE,
     summary: {
       work,
       overtime: sum('overtime'),

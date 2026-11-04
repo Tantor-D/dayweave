@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   calculateStatistics,
   defaultStatistics,
@@ -23,6 +23,7 @@ const clock = (minute: number | null) => {
   return `${String(Math.floor(rounded / 60)).padStart(2, '0')}:${String(rounded % 60).padStart(2, '0')}`;
 };
 const chartLabels = {
+  trend: '折线趋势',
   duration: '每日投入',
   first: '首次工作',
   parallel: '并行分析',
@@ -42,8 +43,8 @@ function Card({
   wide?: boolean;
 }) {
   return (
-    <section className={`${s.card} ${wide ? s.wide : ''}`}>
-      <div className={s.cardHeading}>
+    <section className={`${s.card} ${wide ? s.wide : ''}`} data-chart={title}>
+      <div className={s.cardHeading} title={description}>
         <h2>{title}</h2>
         {description && <p>{description}</p>}
       </div>
@@ -51,8 +52,55 @@ function Card({
     </section>
   );
 }
+function StatisticsDialog({
+  title,
+  children,
+  close,
+}: {
+  title: string;
+  children: ReactNode;
+  close: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current!;
+    dialog.showModal();
+    return () => dialog.close();
+  }, []);
+  return (
+    <dialog ref={ref} className={s.dialog} aria-label={title} onCancel={close}>
+      <header>
+        <h2>{title}</h2>
+        <button onClick={close} aria-label="关闭弹窗">
+          关闭
+        </button>
+      </header>
+      <div className={s.dialogBody}>{children}</div>
+    </dialog>
+  );
+}
+
 function Empty({ children = '这段时间还没有投入记录' }: { children?: ReactNode }) {
   return <div className={s.empty}>{children}</div>;
+}
+
+function useChartSize() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 480, height: 190 });
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0)
+        setSize((previous) =>
+          previous.width === width && previous.height === height ? previous : { width, height },
+        );
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  });
+  return { ref, ...size };
 }
 
 function DailyChart({
@@ -63,6 +111,8 @@ function DailyChart({
   mode: 'duration' | 'first' | 'personal' | 'selectedTag';
 }) {
   const [focused, setFocused] = useState<string | null>(null);
+  const { ref: chartRef, width, height } = useChartSize();
+  const plotHeight = Math.max(10, height - 40);
   const isFirst = mode === 'first';
   const values = days.map((d) => (isFirst ? d.first : mode === 'duration' ? d.work : d[mode]));
   if (!values.some((v) => v !== null && v > 0)) return <Empty />;
@@ -70,10 +120,9 @@ function DailyChart({
     ? 1440
     : Math.max(60, Math.ceil(Math.max(...values.map((v) => v ?? 0)) / 60) * 60);
   const min = isFirst ? 360 : 0;
-  const width = Math.max(640, days.length * 22),
-    plot = width - 72;
+  const plot = width - 72;
   const x = (i: number) => 52 + ((i + 0.5) * plot) / days.length;
-  const y = (value: number) => 206 - ((value - min) / (max - min)) * 166;
+  const y = (value: number) => height - 24 - ((value - min) / (max - min)) * plotHeight;
   const barWidth = Math.min(32, (plot / days.length) * 0.65);
   const firsts = days.flatMap((d) => (d.first === null ? [] : [d.first]));
   const mean = firsts.reduce((a, b) => a + b, 0) / firsts.length;
@@ -88,11 +137,11 @@ function DailyChart({
     `${d.date} · ${isFirst ? `首次工作 ${clock(d.first)}` : mode === 'duration' ? `工作 ${exactDuration(d.work)}，普通 ${exactDuration(d.work - d.lunch - d.overtime)}，午休占用 ${exactDuration(d.lunch)}，加班 ${exactDuration(d.overtime)}` : exactDuration(d[mode])}`;
   return (
     <>
-      <div className={s.chartScroll}>
+      <div className={s.chartScroll} ref={chartRef}>
         <svg
           className={s.chart}
-          viewBox={`0 0 ${width} 248`}
-          style={{ minWidth: Math.min(width, 2200) }}
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="xMidYMid meet"
           role="group"
           aria-label={title}
         >
@@ -138,9 +187,9 @@ function DailyChart({
                   <title>{label}</title>
                   <rect
                     x={x(i) - plot / days.length / 2}
-                    y="32"
+                    y="16"
                     width={plot / days.length}
-                    height="176"
+                    height={plotHeight}
                     fill="transparent"
                   />
                   {isFirst
@@ -155,7 +204,7 @@ function DailyChart({
                             x={x(i) - barWidth / 2}
                             y={y(cumulative)}
                             width={barWidth}
-                            height={(part / max) * 166}
+                            height={(part / max) * plotHeight}
                             rx="2"
                             className={
                               mode === 'personal'
@@ -166,8 +215,8 @@ function DailyChart({
                         );
                       })}
                 </g>
-                {(i % Math.max(1, Math.ceil(days.length / 10)) === 0 || i === days.length - 1) && (
-                  <text x={x(i)} y="232" textAnchor="middle">
+                {i % Math.max(1, Math.ceil(days.length / 6)) === 0 && (
+                  <text x={x(i)} y={height - 6} textAnchor="middle">
                     {d.date.slice(5)}
                   </text>
                 )}
@@ -176,7 +225,7 @@ function DailyChart({
           })}
         </svg>
       </div>
-      <div className={s.chartReadout} role="status">
+      <div className={s.chartReadout} role="status" title={focused ?? undefined}>
         {focused ?? '悬停或用 Tab 聚焦图中日期，查看准确数值'}
       </div>
       {mode === 'duration' && (
@@ -199,6 +248,150 @@ function DailyChart({
   );
 }
 
+const trendMetrics = {
+  work: '工作时长',
+  overtime: '加班时长',
+  lunch: '午休占用',
+  personal: '个人时长',
+  parallelRatio: '并行占比',
+  first: '首次工作时间',
+} as const;
+type TrendMetric = keyof typeof trendMetrics;
+function TrendChart({ days }: { days: StatisticsDay[] }) {
+  const [metric, setMetric] = useState<TrendMetric>('work');
+  const [focused, setFocused] = useState<string | null>(null);
+  const { ref: chartRef, width, height } = useChartSize();
+  const plotHeight = Math.max(10, height - 40);
+  const values = days.map((day) => day[metric]);
+  const valid = values.filter((value): value is number => value !== null);
+  const isClock = metric === 'first',
+    isRatio = metric === 'parallelRatio';
+  const min = isClock ? 360 : 0;
+  const max = isClock
+    ? 1440
+    : isRatio
+      ? 1
+      : Math.max(60, Math.ceil(valid.reduce((a, b) => Math.max(a, b), 0) / 60) * 60);
+  const plot = width - 80;
+  const x = (i: number) => 60 + ((i + 0.5) * plot) / days.length;
+  const y = (value: number) => height - 24 - ((value - min) / (max - min)) * plotHeight;
+  const label = (value: number | null) =>
+    isClock ? clock(value) : isRatio ? percent(value) : value === null ? '—' : exactDuration(value);
+  const hasData = days.some((day) => day.total > 0) && valid.length > 0;
+  return (
+    <>
+      <div className={s.trendToolbar}>
+        <label>
+          分析指标{' '}
+          <select
+            aria-label="趋势指标"
+            value={metric}
+            onChange={(event) => {
+              setMetric(event.target.value as TrendMetric);
+              setFocused(null);
+            }}
+          >
+            {Object.entries(trendMetrics).map(([key, name]) => (
+              <option key={key} value={key}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span>按日 · {isClock ? '时刻' : isRatio ? '百分比' : '小时'}</span>
+      </div>
+      {!hasData ? (
+        <Empty>所选范围没有可分析的记录</Empty>
+      ) : (
+        <>
+          <div className={s.chartScroll} ref={chartRef}>
+            <svg
+              className={s.chart}
+              viewBox={`0 0 ${width} ${height}`}
+              preserveAspectRatio="xMidYMid meet"
+              role="group"
+              aria-label={`${trendMetrics[metric]}折线趋势`}
+            >
+              {[0, 1, 2, 3, 4].map((index) => {
+                const value = min + ((max - min) * index) / 4;
+                return (
+                  <g key={index}>
+                    <line
+                      x1="60"
+                      x2={width - 20}
+                      y1={y(value)}
+                      y2={y(value)}
+                      className={s.gridline}
+                    />
+                    <text x="50" y={y(value) + 4} textAnchor="end">
+                      {isClock
+                        ? clock(value)
+                        : isRatio
+                          ? percent(value)
+                          : `${(value / 60).toFixed(1)}h`}
+                    </text>
+                  </g>
+                );
+              })}
+              {values.map((value, i) => {
+                const previous = values[i - 1];
+                return value !== null && previous !== null && previous !== undefined ? (
+                  <line
+                    key={days[i].date}
+                    x1={x(i - 1)}
+                    y1={y(previous)}
+                    x2={x(i)}
+                    y2={y(value)}
+                    className={s.trendLine}
+                  />
+                ) : null;
+              })}
+              {days.map((day, i) => {
+                const value = values[i];
+                const text = `${day.date} · ${trendMetrics[metric]} ${label(value)}`;
+                return (
+                  <g key={day.date}>
+                    <g
+                      tabIndex={0}
+                      role="img"
+                      aria-label={text}
+                      className={s.point}
+                      onFocus={() => setFocused(text)}
+                      onBlur={() => setFocused(null)}
+                      onMouseEnter={() => setFocused(text)}
+                      onMouseLeave={() => setFocused(null)}
+                    >
+                      <title>{text}</title>
+                      <rect
+                        x={x(i) - plot / days.length / 2}
+                        y="16"
+                        width={plot / days.length}
+                        height={plotHeight}
+                        fill="transparent"
+                      />
+                      {value !== null && (
+                        <circle cx={x(i)} cy={y(value)} r="3" className={s.trendDot} />
+                      )}
+                    </g>
+                    {i % Math.max(1, Math.ceil(days.length / 6)) === 0 && (
+                      <text x={x(i)} y={height - 6} textAnchor="middle">
+                        {day.date.slice(5)}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+          <div className={s.chartReadout} role="status" title={focused ?? undefined}>
+            {focused ?? '悬停或用 Tab 查看每日数值；无首次工作或无占比分母的日期断开连线。'}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export function StatisticsDashboard({
   workspace,
   preferences,
@@ -209,7 +402,9 @@ export function StatisticsDashboard({
   update: (value: StatisticsPreferences) => Promise<boolean>;
 }) {
   const [now, setNow] = useState(Date.now());
-  const [configOpen, setConfigOpen] = useState(false);
+  const [popup, setPopup] = useState<'config' | 'method' | 'dates' | 'details' | null>(null);
+  const [group, setGroup] = useState(0);
+  const [tagPage, setTagPage] = useState(0);
   const [saving, setSaving] = useState(false);
   const range = statisticsRange(preferences, now);
   const [draftStart, setDraftStart] = useState(range.startDate);
@@ -229,15 +424,25 @@ export function StatisticsDashboard({
     [workspace, range.startDate, range.endDate, preferences.tagId, now],
   );
   const summary = data.summary;
+  const rankedTags = [
+    ...data.tags,
+    { id: null, name: '无标签', color: '#8b929e', minutes: data.untaggedMinutes },
+  ]
+    .filter((tag) => tag.minutes > 0)
+    .sort((a, b) => b.minutes - a.minutes);
+  const tagPages = Math.max(1, Math.ceil(rankedTags.length / 4));
+  const currentTagPage = Math.min(tagPage, tagPages - 1);
   const save = async (next: StatisticsPreferences) => {
     setSaving(true);
     try {
-      await update(next);
+      return await update(next);
     } finally {
       setSaving(false);
     }
   };
   const visible = (key: ChartKey) => !preferences.hiddenCharts.includes(key);
+  const groupKeys = ['trend', 'duration', 'first', 'tags', null, 'selectedTag'] as const;
+  const activeGroup = groupKeys[group] === null || visible(groupKeys[group]!) ? group : 4;
   const cards = [
     [
       '工作时长',
@@ -263,17 +468,8 @@ export function StatisticsDashboard({
   ];
   return (
     <main className={s.dashboard} aria-label="统计面板">
-      <div className={s.heading}>
-        <div>
-          <span className={s.eyebrow}>时间与节奏</span>
-          <h1>看见时间的去向</h1>
-          <p>从日常记录中，发现投入、节奏与留给自己的空间。</p>
-        </div>
-        <button onClick={() => setConfigOpen(!configOpen)} aria-expanded={configOpen}>
-          配置展示
-        </button>
-      </div>
       <div className={s.toolbar}>
+        <h1>统计</h1>
         <div className={s.presets}>
           {(['last30', 'week', 'month', 'custom'] as const).map((key, i) => (
             <button
@@ -282,12 +478,13 @@ export function StatisticsDashboard({
               aria-pressed={preferences.range === key}
               onClick={() => {
                 setRangeError('');
+                if (key === 'custom') {
+                  setPopup('dates');
+                  return;
+                }
                 void save({
                   ...preferences,
                   range: key,
-                  ...(key === 'custom'
-                    ? { startDate: range.startDate, endDate: range.endDate }
-                    : {}),
                 });
               }}
             >
@@ -298,10 +495,20 @@ export function StatisticsDashboard({
         <span className={s.rangeLabel}>
           {range.startDate} — {range.endDate}
         </span>
-        {preferences.range === 'custom' && (
+        <div className={s.actions}>
+          {preferences.range === 'custom' && (
+            <button onClick={() => setPopup('dates')}>修改日期</button>
+          )}
+          <button onClick={() => setPopup('details')}>每日明细</button>
+          <button onClick={() => setPopup('config')}>配置</button>
+          <button onClick={() => setPopup('method')}>口径</button>
+        </div>
+      </div>
+      {popup === 'dates' && (
+        <StatisticsDialog title="自定义日期" close={() => setPopup(null)}>
           <form
             className={s.dateForm}
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               if (
                 !validStatisticsDate(draftStart) ||
@@ -312,7 +519,14 @@ export function StatisticsDashboard({
                 return;
               }
               setRangeError('');
-              void save({ ...preferences, startDate: draftStart, endDate: draftEnd });
+              const saved = await save({
+                ...preferences,
+                range: 'custom',
+                startDate: draftStart,
+                endDate: draftEnd,
+              });
+              if (saved) setPopup(null);
+              else setRangeError('日期保存失败，请重试');
             }}
           >
             <input
@@ -332,40 +546,42 @@ export function StatisticsDashboard({
             />
             <button disabled={saving}>应用日期</button>
           </form>
-        )}
-      </div>
-      {rangeError && <p role="alert">{rangeError}</p>}
-      {configOpen && (
-        <section className={s.configuration} aria-label="统计展示配置">
-          <strong>显示图表</strong>
-          {(Object.keys(chartLabels) as ChartKey[]).map((key) => (
-            <label key={key}>
-              <input
-                type="checkbox"
-                checked={visible(key)}
-                disabled={saving}
-                onChange={() =>
-                  void save({
-                    ...preferences,
-                    hiddenCharts: visible(key)
-                      ? [...preferences.hiddenCharts, key]
-                      : preferences.hiddenCharts.filter((k) => k !== key),
-                  })
-                }
-              />
-              {chartLabels[key]}
-            </label>
-          ))}
-          <button
-            disabled={saving}
-            onClick={() => {
-              setRangeError('');
-              void save(structuredClone(defaultStatistics));
-            }}
-          >
-            恢复默认展示
-          </button>
-        </section>
+          {rangeError && <p role="alert">{rangeError}</p>}
+        </StatisticsDialog>
+      )}
+      {popup === 'config' && (
+        <StatisticsDialog title="统计展示配置" close={() => setPopup(null)}>
+          <section className={s.configuration} aria-label="统计展示配置">
+            <strong>显示图表</strong>
+            {(Object.keys(chartLabels) as ChartKey[]).map((key) => (
+              <label key={key}>
+                <input
+                  type="checkbox"
+                  checked={visible(key)}
+                  disabled={saving}
+                  onChange={() =>
+                    void save({
+                      ...preferences,
+                      hiddenCharts: visible(key)
+                        ? [...preferences.hiddenCharts, key]
+                        : preferences.hiddenCharts.filter((k) => k !== key),
+                    })
+                  }
+                />
+                {chartLabels[key]}
+              </label>
+            ))}
+            <button
+              disabled={saving}
+              onClick={() => {
+                setRangeError('');
+                void save(structuredClone(defaultStatistics));
+              }}
+            >
+              恢复默认展示
+            </button>
+          </section>
+        </StatisticsDialog>
       )}
       <div className={s.metrics}>
         {cards.map(([label, value, hint, color]) => (
@@ -373,19 +589,51 @@ export function StatisticsDashboard({
             <h2>{label}</h2>
             <strong>{value}</strong>
             <p>{hint}</p>
+            {label === '并行占比' && visible('parallel') && (
+              <div className={s.parallelMini}>
+                <div>
+                  <i style={{ width: `${(summary.parallelRatio ?? 0) * 100}%` }} />
+                </div>
+                <span>
+                  单任务 {hours(summary.work - summary.parallel)} · 多任务 {hours(summary.parallel)}
+                </span>
+              </div>
+            )}
           </section>
         ))}
       </div>
-      <details className={s.method}>
-        <summary>统计口径 · 已发生的时间轴记录 · 上海时区</summary>
-        <p>
-          包括已完成、未完成和归档任务；未定时及未来安排不计入，今日截至当前时刻。工作任务排除带“个人”标签的任务；任务自身标签决定分类。重叠时段去重，两个不同工作任务同时进行才算并行，父子任务独立参与。
-        </p>
-        <p>
-          首次工作取06:00后的首个工作时段，跨06:00取06:00。标签内部去重，标签之间、个人与工作之间可能重叠，不能直接相加。历史结果随当前任务、安排和标签修改而重算。
-        </p>
-      </details>
-      <div className={s.grid}>
+      {popup === 'method' && (
+        <StatisticsDialog title="统计口径 · 上海时区" close={() => setPopup(null)}>
+          <div className={s.method}>
+            <p>
+              包括已完成、未完成和归档任务；未定时及未来安排不计入，今日截至当前时刻。工作任务排除带“个人”标签的任务；任务自身标签决定分类。重叠时段去重，两个不同工作任务同时进行才算并行，父子任务独立参与。
+            </p>
+            <p>
+              首次工作取06:00后的首个工作时段，跨06:00取06:00。标签内部去重，标签之间、个人与工作之间可能重叠，不能直接相加。历史结果随当前任务、安排和标签修改而重算。
+            </p>
+          </div>
+        </StatisticsDialog>
+      )}
+      <nav className={s.groupNav} aria-label="图表分组">
+        {['投入趋势', '每日投入', '工作节奏', '标签排行', '个人时间', '关注标签'].map(
+          (label, index) => (
+            <button
+              key={label}
+              disabled={groupKeys[index] !== null && !visible(groupKeys[index]!)}
+              aria-pressed={activeGroup === index}
+              onClick={() => setGroup(index)}
+            >
+              {label}
+            </button>
+          ),
+        )}
+      </nav>
+      <div className={s.grid} data-group={activeGroup}>
+        {visible('trend') && (
+          <Card title="投入如何变化" description="折线趋势 · 切换指标，观察每天的投入与节奏" wide>
+            <TrendChart days={data.days} />
+          </Card>
+        )}
         {visible('duration') && (
           <Card title="每日投入" description="普通工作、午休占用与加班，合计为当天工作时长" wide>
             <DailyChart days={data.days} mode="duration" />
@@ -400,54 +648,15 @@ export function StatisticsDashboard({
             <DailyChart days={data.days} mode="first" />
           </Card>
         )}
-        {visible('parallel') && (
-          <Card title="专注与并行" description="按真实经过的时间去重，不叠加任务时长">
-            {summary.work ? (
-              <>
-                <div className={s.splitSummary}>
-                  <strong>{percent(summary.parallelRatio)}</strong>
-                  <span>工作时间在处理多个任务</span>
-                </div>
-                <svg
-                  viewBox="0 0 500 42"
-                  className={s.split}
-                  role="img"
-                  aria-label={`单任务 ${hours(summary.work - summary.parallel)}，多任务 ${hours(summary.parallel)}`}
-                >
-                  <rect x="0" y="4" width="500" height="30" rx="12" className={s.workFill} />
-                  <rect
-                    x={500 * (1 - (summary.parallelRatio ?? 0))}
-                    y="4"
-                    width={500 * (summary.parallelRatio ?? 0)}
-                    height="30"
-                    rx="8"
-                    className={s.overtimeFill}
-                  />
-                </svg>
-                <div className={s.splitLabels}>
-                  <span>
-                    单任务 <b>{hours(summary.work - summary.parallel)}</b>
-                  </span>
-                  <span>
-                    多任务 <b>{hours(summary.parallel)}</b>
-                  </span>
-                </div>
-              </>
-            ) : (
-              <Empty />
-            )}
-          </Card>
-        )}
         {visible('tags') && (
-          <Card title="时间花在了哪里" description="标签内部去重；多标签之间可能重叠">
-            {!data.tags.some((tag) => tag.minutes > 0) ? (
+          <Card title="时间花在了哪里" description="含无标签任务；分类内部去重，分类之间可能重叠">
+            {rankedTags.length === 0 ? (
               <Empty />
             ) : (
-              <div className={s.ranking}>
-                {data.tags
-                  .filter((tag) => tag.minutes > 0)
-                  .map((tag) => (
-                    <div className={s.rankRow} key={tag.id}>
+              <>
+                <div className={s.ranking}>
+                  {rankedTags.slice(currentTagPage * 4, currentTagPage * 4 + 4).map((tag) => (
+                    <div className={s.rankRow} key={tag.id === null ? 'untagged' : `tag-${tag.id}`}>
                       <span title={tag.name}>{tag.name}</span>
                       <svg
                         viewBox="0 0 240 14"
@@ -456,7 +665,7 @@ export function StatisticsDashboard({
                       >
                         <rect width="240" height="14" rx="7" className={s.track} />
                         <rect
-                          width={(240 * tag.minutes) / data.tags[0].minutes}
+                          width={(240 * tag.minutes) / rankedTags[0].minutes}
                           height="14"
                           rx="7"
                           fill={tag.color}
@@ -465,7 +674,25 @@ export function StatisticsDashboard({
                       <b>{hours(tag.minutes)}</b>
                     </div>
                   ))}
-              </div>
+                </div>
+                <div className={s.pagination}>
+                  <button
+                    disabled={currentTagPage === 0}
+                    onClick={() => setTagPage(currentTagPage - 1)}
+                  >
+                    上一页
+                  </button>
+                  <span>
+                    {currentTagPage + 1} / {tagPages} · {rankedTags.length} 个分类
+                  </span>
+                  <button
+                    disabled={currentTagPage + 1 >= tagPages}
+                    onClick={() => setTagPage(currentTagPage + 1)}
+                  >
+                    下一页
+                  </button>
+                </div>
+              </>
             )}
           </Card>
         )}
@@ -529,92 +756,95 @@ export function StatisticsDashboard({
             )}
           </Card>
         )}
-        <Card
-          title="每日明细"
-          description="点击日期展开任务时段，数值均按当天已发生的区间计算"
-          wide
-        >
-          {!data.days.length ? (
-            <Empty>所选范围尚无已发生的日期</Empty>
-          ) : (
-            <div className={s.tableScroll}>
-              <table>
-                <thead>
-                  <tr>
-                    {[
-                      '日期',
-                      '首次工作',
-                      '最后结束',
-                      '工作',
-                      '加班',
-                      '午休占用',
-                      '并行',
-                      '并行占比',
-                      '个人',
-                    ].map((label) => (
-                      <th key={label}>{label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...data.days].reverse().map((day) => (
-                    <Fragment key={day.date}>
-                      <tr>
-                        <td>
-                          <button
-                            aria-expanded={expanded === day.date}
-                            onClick={() => setExpanded(expanded === day.date ? null : day.date)}
-                          >
-                            {expanded === day.date ? '−' : '+'} {day.date}
-                          </button>
-                        </td>
-                        <td>{clock(day.first)}</td>
-                        <td>{clock(day.last)}</td>
-                        <td>{hours(day.work)}</td>
-                        <td>{hours(day.overtime)}</td>
-                        <td>{hours(day.lunch)}</td>
-                        <td>{hours(day.parallel)}</td>
-                        <td>{percent(ratio(day.parallel, day.work))}</td>
-                        <td>{hours(day.personal)}</td>
-                      </tr>
-                      {expanded === day.date && (
-                        <tr>
-                          <td colSpan={9}>
-                            <div className={s.dayDetails}>
-                              {day.details.length
-                                ? day.details.map((detail) => (
-                                    <div key={detail.taskId}>
-                                      <strong>{detail.title}</strong>
-                                      <span>
-                                        {detail.personal ? '个人' : '工作'} ·{' '}
-                                        {detail.intervals
-                                          .map(([a, b]) => `${clock(a)}–${clock(b)}`)
-                                          .join('、')}
-                                      </span>
-                                      <small>
-                                        {detail.tagIds
-                                          .map(
-                                            (id) => workspace.tags.find((t) => t.id === id)?.name,
-                                          )
-                                          .filter(Boolean)
-                                          .join(' · ') || '无标签'}
-                                      </small>
-                                    </div>
-                                  ))
-                                : '当天没有定时投入记录'}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
       </div>
-      <p className={s.footer}>时间记录不等于打卡证明。给每一次投入留痕，也给休息留出位置。</p>
+      {popup === 'details' && (
+        <StatisticsDialog title="每日明细" close={() => setPopup(null)}>
+          <Card
+            title="每日明细"
+            description="点击日期展开任务时段，数值均按当天已发生的区间计算"
+            wide
+          >
+            {!data.days.length ? (
+              <Empty>所选范围尚无已发生的日期</Empty>
+            ) : (
+              <div className={s.tableScroll}>
+                <table>
+                  <thead>
+                    <tr>
+                      {[
+                        '日期',
+                        '首次工作',
+                        '最后结束',
+                        '工作',
+                        '加班',
+                        '午休占用',
+                        '并行',
+                        '并行占比',
+                        '个人',
+                      ].map((label) => (
+                        <th key={label}>{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...data.days].reverse().map((day) => (
+                      <Fragment key={day.date}>
+                        <tr>
+                          <td>
+                            <button
+                              aria-expanded={expanded === day.date}
+                              onClick={() => setExpanded(expanded === day.date ? null : day.date)}
+                            >
+                              {expanded === day.date ? '−' : '+'} {day.date}
+                            </button>
+                          </td>
+                          <td>{clock(day.first)}</td>
+                          <td>{clock(day.last)}</td>
+                          <td>{hours(day.work)}</td>
+                          <td>{hours(day.overtime)}</td>
+                          <td>{hours(day.lunch)}</td>
+                          <td>{hours(day.parallel)}</td>
+                          <td>{percent(ratio(day.parallel, day.work))}</td>
+                          <td>{hours(day.personal)}</td>
+                        </tr>
+                        {expanded === day.date && (
+                          <tr>
+                            <td colSpan={9}>
+                              <div className={s.dayDetails}>
+                                {day.details.length
+                                  ? day.details.map((detail) => (
+                                      <div key={detail.taskId}>
+                                        <strong>{detail.title}</strong>
+                                        <span>
+                                          {detail.personal ? '个人' : '工作'} ·{' '}
+                                          {detail.intervals
+                                            .map(([a, b]) => `${clock(a)}–${clock(b)}`)
+                                            .join('、')}
+                                        </span>
+                                        <small>
+                                          {detail.tagIds
+                                            .map(
+                                              (id) => workspace.tags.find((t) => t.id === id)?.name,
+                                            )
+                                            .filter(Boolean)
+                                            .join(' · ') || '无标签'}
+                                        </small>
+                                      </div>
+                                    ))
+                                  : '当天没有定时投入记录'}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </StatisticsDialog>
+      )}
     </main>
   );
 }

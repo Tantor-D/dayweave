@@ -348,6 +348,25 @@
   cursor: grab;
   touch-action: none;
 }
+.taskRow.rootTask {
+  position: relative;
+}
+.taskRow.rootTask:not(:first-child) {
+  margin-top: 16px;
+}
+.taskRow.rootTask:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+.rootTask .taskText > span {
+  font-weight: 600;
+}
 .taskRow:hover {
   background: var(--card);
 }
@@ -374,14 +393,7 @@
   line-height: 1.5;
   word-break: break-word;
 }
-.taskText small {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 2px;
-}
+
 .taskGrip {
   color: var(--muted);
   opacity: 0;
@@ -1469,7 +1481,7 @@
   flex-direction: row;
   align-items: center;
   gap: 12px;
-  padding: 10px;
+  padding: 6px 10px;
   border-radius: 8px;
   color: var(--text);
   cursor: pointer;
@@ -1486,12 +1498,6 @@
 .taskChoice span {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-.taskChoice small {
-  display: block;
-  color: var(--muted);
-  font-size: 10px;
-  margin-top: 5px;
 }
 .toast {
   position: fixed;
@@ -1908,4 +1914,75 @@
   background: var(--bg);
   color: var(--text);
   box-shadow: 0 10px 60px #0005;
+}
+
+.completedToggle {
+  align-self: flex-start;
+  margin: 0;
+  padding: 4px 9px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.completedToggle[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.taskRow.sortBefore {
+  box-shadow: 0 -2px 0 var(--accent);
+}
+.taskRow.sortAfter {
+  box-shadow: 0 2px 0 var(--accent);
+}
+
+.rootDropZone {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border: 1px dashed var(--accent);
+  border-radius: 9px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--accent);
+}
+.rootDropZone.rootDropActive {
+  background: var(--accent-soft);
+  border-style: solid;
+}
+
+.taskListControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 18px 4px;
+  flex-shrink: 0;
+}
+.rootDropZone[aria-hidden='true'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+
+.dayTreeRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+.dayTreeRow .dayChip {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dayTreeToggle {
+  flex: 0 0 16px;
+  padding: 7px 0;
+  border: 0;
+}
+.dayTreeSpacer {
+  flex: 0 0 16px;
+}
+.dayChip.dayTreeContext {
+  background: transparent;
+  border-left-style: dashed;
 }

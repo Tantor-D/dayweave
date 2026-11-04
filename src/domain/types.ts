@@ -118,7 +118,7 @@ export interface StatisticsPreferences {
   startDate: string | null;
   endDate: string | null;
   tagId: string | null;
-  hiddenCharts: ('duration' | 'first' | 'parallel' | 'tags' | 'selectedTag')[];
+  hiddenCharts: ('trend' | 'duration' | 'first' | 'parallel' | 'tags' | 'selectedTag')[];
 }
 export interface Preferences {
   statistics: StatisticsPreferences;

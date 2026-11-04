@@ -1,3 +1,4 @@
+import { readPreferences, savePreferences } from './preferences';
 import { StatisticsDashboard } from './StatisticsDashboard';
 import statisticsStyles from './StatisticsDashboard.module.css';
 import { defaultStatistics } from '../domain/statistics.ts';
@@ -53,8 +54,7 @@ import {
   atMinute,
   datesFrom,
   today,
-  filterDates,
-  taskOnDay,
+  matchesSidebarDate,
   type TaskDateFilter,
 } from './time';
 import { themeStyle, ViewLayout, ThemeContext, ThemeCard } from './themes';
@@ -151,7 +151,7 @@ export default function App() {
       if (!cancelled && (!events || events.readyState === EventSource.CLOSED)) openEvents();
     };
     void sync();
-    void api<Preferences>('/preferences')
+    void readPreferences()
       .then(setPreferences)
       .catch((e) => notify(e.message, true));
     const interval = setInterval(() => void sync(), 5000);
@@ -241,7 +241,7 @@ export default function App() {
     const before = preferencesRef.current;
     setPreferences({ ...before, ...patch });
     try {
-      setPreferences(await api<Preferences>('/preferences', patch, 'PATCH'));
+      setPreferences(await savePreferences(patch));
       return true;
     } catch (e) {
       setPreferences(before);
@@ -279,10 +279,7 @@ export default function App() {
         );
       })
       .sort((a, b) => a.order - b.order) || [];
-  const selectedDates = filterDates(dateFilter);
-  const sidebarHits = filteredTasks.filter(
-    (t) => dateFilter === 'all' || selectedDates.some((d) => taskOnDay(t, d)),
-  );
+  const sidebarHits = filteredTasks.filter((task) => matchesSidebarDate(task, dateFilter));
   const sidebarIds = new Set(
     sidebarHits.flatMap((t) => [t.id, ...ancestors(t, workspace?.tasks ?? []).map((a) => a.id)]),
   );
@@ -359,8 +356,12 @@ export default function App() {
       key={task.id}
       data-task-drop={task.id}
       style={{ marginLeft: Math.min(ancestors(task, workspace?.tasks ?? []).length, 8) * 14 }}
-      title={taskPath(task, workspace?.tasks ?? [])}
-      className={`${s.taskRow} ${selected === task.id && panel === 'task' ? s.selectedTask : ''} ${task.status === 'done' ? s.done : ''} ${drag?.parentTarget?.id === task.id ? s.parentDropTarget : ''}`}
+      title={[
+        taskPath(task, workspace?.tasks ?? []),
+        workspace?.tags.filter((tag) => task.tagIds.includes(tag.id)).map((tag) => tag.name).join(' · '),
+        task.archivedAt ? '已归档' : '',
+      ].filter(Boolean).join('\n')}
+      className={`${s.taskRow} ${!task.parentId ? s.rootTask : ''} ${selected === task.id && panel === 'task' ? s.selectedTask : ''} ${task.status === 'done' ? s.done : ''} ${drag?.parentTarget?.id === task.id ? s.parentDropTarget : ''} ${drag?.sortTarget?.id === task.id ? (drag.sortTarget.side === 'before' ? s.sortBefore : s.sortAfter) : ''}`}
       onPointerDown={(e) => start(e, task)}
       onClick={() => select(task.id)}
       onKeyDown={(e) => {
@@ -393,13 +394,6 @@ export default function App() {
         </button>
         <div className={s.taskText}>
           <span>{task.title}</span>
-          <small>
-            {workspace?.tags
-              .filter((t) => task.tagIds.includes(t.id))
-              .map((t) => t.name)
-              .join(' · ')}
-            {task.archivedAt && ' · 已归档'}
-          </small>
         </div>
         <span className={s.taskGrip}>⠿</span>
       </ThemeCard>
@@ -572,7 +566,31 @@ export default function App() {
                         标签管理
                       </button>
                     </div>
-                    <div className={s.taskList}>
+                    <div className={s.taskListControls}>
+                      <button
+                        className={s.completedToggle}
+                        aria-pressed={!preferences.hiddenStatuses.includes('done')}
+                        onClick={() =>
+                          void updatePreferences({
+                            hiddenStatuses: preferences.hiddenStatuses.includes('done')
+                              ? preferences.hiddenStatuses.filter((status) => status !== 'done')
+                              : [...preferences.hiddenStatuses, 'done'],
+                          })
+                        }
+                      >
+                        {preferences.hiddenStatuses.includes('done')
+                          ? '不显示已完成'
+                          : '显示已完成'}
+                      </button>
+                      <div
+                        data-root-drop="true"
+                        aria-hidden={!(drag?.moved && !drag.original && drag.task.parentId)}
+                        className={`${s.rootDropZone} ${drag?.rootTarget ? s.rootDropActive : ''}`}
+                      >
+                        设为一级任务
+                      </div>
+                    </div>
+                    <div className={s.taskList} data-root-drop="true">
                       {sidebarHits.length === 0 ? (
                         <div className={s.emptyTasks}>
                           <div className={s.emptyIllustration}>
@@ -724,6 +742,7 @@ export default function App() {
                     </div>
                     <Timeline
                       tasks={filteredTasks}
+                      allTasks={workspace.tasks}
                       tags={workspace.tags}
                       dayStart={preferences.dayStart}
                       dayEnd={preferences.dayEnd}
@@ -848,15 +867,24 @@ function NewTaskDialog({
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(emptyTaskDraft),
+    [scheduledDate, setScheduledDate] = useState(today),
     [busy, setBusy] = useState(false);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
+    const taskId = crypto.randomUUID();
     try {
       await onCreate([
         {
           type: 'task.create',
+          id: taskId,
           ...draft,
+        },
+        {
+          type: 'placement.put',
+          taskId,
+          placement: { id: crypto.randomUUID(), kind: 'day', date: scheduledDate },
         },
       ]);
     } finally {
@@ -888,7 +916,17 @@ function NewTaskDialog({
         </div>
         <form className={s.form} onSubmit={(e) => void submit(e)}>
           <TaskFields workspace={workspace} draft={draft} onChange={setDraft} />
-          <p className={s.hint}>不必立刻安排时间，先把事情放下来。</p>
+          <label>
+            安排日期
+            <input
+              type="date"
+              aria-label="新任务安排日期"
+              required
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
+            />
+          </label>
+          <p className={s.hint}>默认安排到今天，不指定起止时间。</p>
           <button className={s.primary} disabled={busy}>
             {busy ? <LoaderCircle className={s.spin} size={15} /> : <Plus size={15} />}创建任务
           </button>

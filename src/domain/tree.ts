@@ -34,3 +34,19 @@ export function treeOrder(tasks: Task[]): Task[] {
   }
   return result;
 }
+
+/** Existing-task picker keeps the paths to search hits while excluding unavailable branches. */
+export function unfinishedTaskTree(tasks: Task[], query = ''): Task[] {
+  const available = tasks.filter((task) =>
+    [task, ...ancestors(task, tasks)].every((item) => item.status !== 'done' && !item.archivedAt),
+  );
+  const search = query.trim().toLowerCase();
+  if (!search) return treeOrder(available);
+  const hits = available.filter((task) =>
+    `${taskPath(task, tasks)} ${task.description}`.toLowerCase().includes(search),
+  );
+  const ids = new Set(
+    hits.flatMap((task) => [task.id, ...ancestors(task, available).map((a) => a.id)]),
+  );
+  return treeOrder(available.filter((task) => ids.has(task.id)));
+}

@@ -129,6 +129,32 @@ test('statistics: personal and multi-tag records overlap independently, archived
   assert.equal(r.days[0].details.length, 3);
 });
 
+test('statistics: untagged time merges overlaps and uses task own tags within elapsed range', () => {
+  const w = workspace([
+    localTask('parent', [['08:00', '10:00']], { tagIds: ['study'] }),
+    localTask('child', [['09:00', '11:00']], { parentId: 'parent' }),
+    localTask('archived', [['10:00', '12:00']], { archivedAt: instant(date, '23:00') }),
+    localTask('future', [['13:00', '14:00']]),
+    localTask('day', [], { placements: [{ id: 'day', kind: 'day', date }] }),
+  ]);
+  const result = analyze(w, { now: Date.parse(instant(date, '11:30')) });
+  assert.equal(result.untaggedMinutes, 150);
+  assert.equal(result.tags.find((tag) => tag.id === 'study')!.minutes, 120);
+  assert.equal(result.summary.total, 210);
+});
+
+test('statistics: untagged time works without any tags and is zero without untagged records', () => {
+  const w = workspace([localTask('a', [['09:00', '10:00']])]);
+  w.tags = [];
+  assert.equal(analyze(w).untaggedMinutes, 60);
+  assert.equal(analyze(workspace([])).untaggedMinutes, 0);
+  assert.equal(
+    analyze(workspace([localTask('tagged', [['09:00', '10:00']], { tagIds: ['study'] })]))
+      .untaggedMinutes,
+    0,
+  );
+});
+
 test('statistics: overtime crosses midnight, month and year; clips to inclusive selected dates', () => {
   for (const [from, to] of [
     ['2026-11-02', '2026-11-03'],
@@ -268,7 +294,7 @@ test('statistics preferences: old files default safely, invalid patches preserve
     startDate: '2026-10-01',
     endDate: '2026-11-02',
     tagId: 'study',
-    hiddenCharts: ['tags' as const],
+    hiddenCharts: ['tags' as const, 'trend' as const],
   };
   await store.updatePreferences({ statistics: saved });
   const before = await readFile(path, 'utf8');

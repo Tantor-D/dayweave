@@ -1,5 +1,5 @@
 import { TaskFields, emptyTaskDraft } from './TaskFields';
-import { ancestors, taskPath } from '../domain/tree';
+import { ancestors, taskPath, unfinishedTaskTree } from '../domain/tree';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { CalendarPlus, LoaderCircle, Search, X } from 'lucide-react';
 import type { Operation, Placement, Workspace } from '../domain/types';
@@ -37,14 +37,8 @@ export function ScheduleDialog({
     element.showModal();
     return () => element.close();
   }, []);
-  const available = workspace.tasks.filter(
-    (task) => !task.archivedAt && !ancestors(task, workspace.tasks).some((t) => t.archivedAt),
-  );
-  const matches = available.filter((task) =>
-    `${taskPath(task, workspace.tasks)} ${task.description}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
+  const available = unfinishedTaskTree(workspace.tasks);
+  const matches = unfinishedTaskTree(workspace.tasks, query);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (busy) return;
@@ -137,7 +131,12 @@ export function ScheduleDialog({
             className={mode === 'existing' ? s.active : ''}
             onClick={() => {
               setMode('existing');
-              if (taskId) setDraft(available.find((t) => t.id === taskId)!);
+              const selected = available.find((t) => t.id === taskId);
+              if (selected) setDraft(selected);
+              else {
+                setTaskId('');
+                setDraft(emptyTaskDraft());
+              }
               setEditing(false);
             }}
           >
@@ -161,7 +160,12 @@ export function ScheduleDialog({
             <div className={s.taskChoices} role="group" aria-label="选择已有任务">
               {matches.length ? (
                 matches.map((task) => (
-                  <label key={task.id} className={s.taskChoice}>
+                  <label
+                    key={task.id}
+                    className={s.taskChoice}
+                    style={{ marginLeft: ancestors(task, available).length * 16 }}
+                    title={taskPath(task, workspace.tasks)}
+                  >
                     <input
                       type="radio"
                       name="existing-task"
@@ -173,16 +177,13 @@ export function ScheduleDialog({
                       }}
                     />
                     <span>
-                      {taskPath(task, workspace.tasks)}
-                      <small>
-                        {'任务'} · {task.placements.length} 次安排
-                        {task.status === 'done' ? ' · 已完成' : ''}
-                      </small>
+                      {task.parentId && <span aria-hidden="true">↳ </span>}
+                      {task.title}
                     </span>
                   </label>
                 ))
               ) : (
-                <p className={s.hint}>没有匹配的未归档任务。</p>
+                <p className={s.hint}>没有匹配的未完成任务。</p>
               )}
             </div>
             {taskId && (

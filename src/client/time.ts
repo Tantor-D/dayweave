@@ -1,3 +1,4 @@
+import { ancestors, treeOrder } from '../domain/tree';
 import type { Placement, Task } from '../domain/types';
 export const MINUTES_PER_DAY = 1440;
 export const today = () =>
@@ -157,4 +158,58 @@ export function placementInWindow(
     startAt: atMinute(date, minute),
     endAt: atMinute(date, Math.min(end, minute + 60)),
   };
+}
+
+/** Sidebar overdue status uses the latest scheduled end, not an earlier superseded placement. */
+export function isOverdueTask(task: Task, base = today()): boolean {
+  const midnight = Date.parse(atMinute(base, 0));
+  return (
+    task.status === 'todo' &&
+    task.placements.length > 0 &&
+    task.placements.every((p) =>
+      p.kind === 'day' ? p.date < base : Date.parse(p.endAt) <= midnight,
+    )
+  );
+}
+export function matchesSidebarDate(task: Task, filter: TaskDateFilter, base = today()): boolean {
+  return (
+    filter === 'all' ||
+    isOverdueTask(task, base) ||
+    filterDates(filter, base).some((date) => taskOnDay(task, date))
+  );
+}
+
+/** Ancestors without an arrangement that day are context only, never synthetic placements. */
+export function dayTaskRows(
+  tasks: Task[],
+  allTasks: Task[],
+  date: string,
+  expanded: ReadonlySet<string>,
+) {
+  const placements = new Map(
+    tasks.flatMap((task) => {
+      const placement = task.placements.find((p) => p.kind === 'day' && p.date === date);
+      return placement ? [[task.id, placement] as const] : [];
+    }),
+  );
+  const ids = new Set(
+    tasks
+      .filter((task) => placements.has(task.id))
+      .flatMap((task) => [task.id, ...ancestors(task, allTasks).map((parent) => parent.id)]),
+  );
+  const included = allTasks.filter((task) => ids.has(task.id));
+  const parents = new Set(included.map((task) => task.parentId));
+  return treeOrder(included).flatMap((task) => {
+    const lineage = ancestors(task, included);
+    return lineage.every((parent) => expanded.has(parent.id))
+      ? [
+          {
+            task,
+            placement: placements.get(task.id),
+            depth: lineage.length,
+            hasChildren: parents.has(task.id),
+          },
+        ]
+      : [];
+  });
 }
