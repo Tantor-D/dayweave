@@ -1,7 +1,7 @@
 import type { Workspace, StatisticsPreferences } from './types.ts';
 
 export const defaultStatistics: StatisticsPreferences = {
-  range: 'last30',
+  range: 'week',
   startDate: null,
   endDate: null,
   tagId: null,

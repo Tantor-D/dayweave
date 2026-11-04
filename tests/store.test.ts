@@ -622,7 +622,7 @@ test('read-only inspection does not overwrite damaged runtime snapshot files', a
 
 test('parent auto-completion preference persists and governs previews across sources', async (t) => {
   const f = await fixture(t);
-  assert.equal((await f.store.getPreferences()).autoCompleteParents, true);
+  assert.equal((await f.store.getPreferences()).autoCompleteParents, false);
   await apply(f.store, [
     { type: 'task.create', id: 'root', title: 'Root' },
     { type: 'task.create', id: 'parent', title: 'Parent', parentId: 'root' },

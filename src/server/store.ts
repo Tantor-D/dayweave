@@ -37,19 +37,19 @@ interface StoreOptions {
 const defaults: Preferences = {
   statistics: structuredClone(defaultStatistics),
   neumorphism: { ...defaultNeumorphism },
-  theme: 'glass-light',
-  days: 3,
+  theme: 'neumorphism-light',
+  days: 1,
   orientation: 'vertical',
   showUntimed: false,
-  panelWidth: 300,
+  panelWidth: 352.734375,
   hiddenTags: [],
   hiddenTasks: [],
   hiddenStatuses: [],
   showArchived: false,
-  dayStart: 0,
-  dayEnd: 1440,
+  dayStart: 600,
+  dayEnd: 1290,
   inheritParentTags: true,
-  autoCompleteParents: true,
+  autoCompleteParents: false,
 };
 export const hashContent = (content: string | null): string | null =>
   content === null ? null : createHash('sha256').update(content, 'utf8').digest('hex');

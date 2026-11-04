@@ -8,12 +8,12 @@ export interface NeumorphismSettings {
   light: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 export const defaultNeumorphism: NeumorphismSettings = {
-  background: '#e0e0e0',
+  background: '#f3f3f8',
   accent: '#365c87',
-  radius: 20,
-  distance: 6,
-  intensity: 0.15,
-  blur: 18,
+  radius: 13,
+  distance: 11,
+  intensity: 0.22,
+  blur: 11,
   light: 'top-left',
 };
 export function isLightSurface(color: string): boolean {

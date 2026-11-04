@@ -27,8 +27,8 @@ test('neumorphism validates complete settings and rejects unsafe ranges', () => 
 test('light direction reverses relief, while accent foreground remains readable', () => {
   const a = neumorphismTokens();
   const b = neumorphismTokens({ ...defaultNeumorphism, light: 'bottom-right' });
-  assert.match(a['--shadow'], /^6px 6px/);
-  assert.match(b['--shadow'], /^-6px -6px/);
+  assert.match(a['--shadow'], /^11px 11px/);
+  assert.match(b['--shadow'], /^-11px -11px/);
   assert.equal(
     neumorphismTokens({ ...defaultNeumorphism, accent: '#ffffff' })['--on-accent'],
     '#000000',
@@ -44,6 +44,15 @@ test('old preferences acquire defaults and settings survive restarts and unrelat
   let store = await Store.open(options);
   try {
     const old = await store.getPreferences();
+    assert.equal(old.theme, 'neumorphism-light');
+    assert.equal(old.days, 1);
+    assert.equal(old.orientation, 'vertical');
+    assert.equal(old.showUntimed, false);
+    assert.equal(old.dayStart, 600);
+    assert.equal(old.dayEnd, 1290);
+    assert.equal(old.autoCompleteParents, false);
+    assert.equal(old.statistics.range, 'week');
+    assert.deepEqual(old.neumorphism, defaultNeumorphism);
     delete old.neumorphism;
     await writeFile(join(options.dataDir, 'preferences.json'), JSON.stringify(old));
     assert.deepEqual((await store.getPreferences()).neumorphism, defaultNeumorphism);

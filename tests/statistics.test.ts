@@ -267,7 +267,7 @@ test('statistics: calendar shortcuts and strict dates are host timezone independ
     startDate: '2026-11-01',
     endDate: '2026-11-02',
   });
-  assert.deepEqual(statisticsRange(defaultStatistics, now), {
+  assert.deepEqual(statisticsRange({ ...defaultStatistics, range: 'last30' }, now), {
     startDate: '2026-10-04',
     endDate: '2026-11-02',
   });

@@ -7,6 +7,7 @@ import type {
   Snapshot,
   Workspace,
 } from '../../domain/types';
+import { defaultNeumorphism } from '../../domain/neumorphism';
 import { defaultStatistics } from '../../domain/statistics';
 import { ancestors, taskPath } from '../../domain/tree';
 import type { TagConfirmation } from '../TagPropagationDialog';
@@ -15,20 +16,21 @@ import { api, commit, readWorkspace } from '../api';
 import { useScheduleDrag } from '../scheduleDrag';
 import { atMinute, datesFrom, today, matchesSidebarDate, type TaskDateFilter } from '../time';
 const initialPreferences: Preferences = {
+  neumorphism: { ...defaultNeumorphism },
   statistics: structuredClone(defaultStatistics),
-  theme: 'glass-light',
-  days: 3,
+  theme: 'neumorphism-light',
+  days: 1,
   orientation: 'vertical',
   showUntimed: false,
-  panelWidth: 282,
+  panelWidth: 352.734375,
   hiddenTags: [],
   hiddenTasks: [],
   hiddenStatuses: [],
   showArchived: false,
-  dayStart: 0,
-  dayEnd: 1440,
+  dayStart: 600,
+  dayEnd: 1290,
   inheritParentTags: true,
-  autoCompleteParents: true,
+  autoCompleteParents: false,
 };
 type Panel =
   | 'task'
