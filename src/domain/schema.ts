@@ -143,6 +143,7 @@ export const preferencesSchema = z.strictObject({
   theme: z.enum(['glass-light', 'glass-dark', 'neobrutalism-light', 'claymorphism-light', 'neumorphism-light']),
   days: z.union([z.literal(1), z.literal(3), z.literal(7)]),
   orientation: z.enum(['vertical', 'horizontal']),
+  showUntimed: z.boolean(),
   panelWidth: z.number().min(200).max(700),
   hiddenTags: z.array(idSchema),
   hiddenTasks: z.array(idSchema),
@@ -151,6 +152,7 @@ export const preferencesSchema = z.strictObject({
   dayStart: z.number().int().min(0).max(1439),
   dayEnd: z.number().int().min(1).max(1440),
   inheritParentTags: z.boolean(),
+  autoCompleteParents: z.boolean(),
 });
 export const jsonSchemas = {
   workspace: z.toJSONSchema(workspaceSchema, { target: 'draft-7' }),

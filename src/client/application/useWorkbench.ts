@@ -19,6 +19,7 @@ const initialPreferences: Preferences = {
   theme: 'glass-light',
   days: 3,
   orientation: 'vertical',
+  showUntimed: false,
   panelWidth: 282,
   hiddenTags: [],
   hiddenTasks: [],
@@ -27,6 +28,7 @@ const initialPreferences: Preferences = {
   dayStart: 0,
   dayEnd: 1440,
   inheritParentTags: true,
+  autoCompleteParents: true,
 };
 type Panel =
   | 'task'
@@ -48,7 +50,7 @@ export function useWorkbench() {
     [panel, setPanel] = useState<Panel>(),
     [selected, setSelected] = useState<string>(),
     [search, setSearch] = useState(''),
-    [dateFilter, setDateFilter] = useState<TaskDateFilter>('all'),
+    [dateFilter, setDateFilter] = useState<TaskDateFilter>('today'),
     [newTask, setNewTask] = useState(false),
     [schedule, setSchedule] = useState<{ placement: Placement; base: Snapshot<Workspace> }>(),
     [busy, setBusy] = useState(false),

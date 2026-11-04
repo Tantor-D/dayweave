@@ -84,6 +84,16 @@ export function ScheduleDialog({
           ? { ...placement, date }
           : { ...placement, startAt: localToUTC(startAt), endAt: localToUTC(endAt) },
     });
+    if (mode === 'new' && placement.kind === 'timed')
+      operations.push({
+        type: 'placement.put',
+        taskId: id,
+        placement: {
+          id: crypto.randomUUID(),
+          kind: 'day',
+          date: dateOf(localToUTC(startAt)),
+        },
+      });
     setBusy(true);
     try {
       if (await onSave(operations, setError)) onClose();
@@ -240,7 +250,9 @@ export function ScheduleDialog({
         <p className={s.hint}>
           {placement.kind === 'day'
             ? '只确定日期，具体时间可以之后再安排。'
-            : 'Asia/Shanghai · 支持跨日，可与其他任务重叠。'}
+            : mode === 'new'
+              ? 'Asia/Shanghai · 支持跨日；同时添加开始日期的未定时安排，显示在待办页面。'
+              : 'Asia/Shanghai · 支持跨日，可与其他任务重叠。'}
         </p>
         {error && (
           <p role="alert" className={s.errorText}>

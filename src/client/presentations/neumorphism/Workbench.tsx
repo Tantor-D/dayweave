@@ -18,6 +18,8 @@ import {
   Circle,
   Columns3,
   Filter,
+  Eye,
+  EyeOff,
   Folder,
   History,
   ListTodo,
@@ -467,6 +469,15 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                       </div>
                       <div className={s.viewActions}>
                         <button
+                          aria-pressed={preferences.showUntimed}
+                          onClick={() =>
+                            void updatePreferences({ showUntimed: !preferences.showUntimed })
+                          }
+                        >
+                          {preferences.showUntimed ? <EyeOff size={15} /> : <Eye size={15} />}
+                          {preferences.showUntimed ? '隐藏未定时' : '显示未定时'}
+                        </button>
+                        <button
                           aria-label="切换时间轴方向"
                           onClick={() =>
                             void updatePreferences({
@@ -501,6 +512,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                       dayEnd={preferences.dayEnd}
                       dates={dates}
                       orientation={preferences.orientation}
+                      showUntimed={preferences.showUntimed}
                       onSelect={select}
                       onDrag={start}
                       preview={drag}

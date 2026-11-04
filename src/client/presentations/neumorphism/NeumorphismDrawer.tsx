@@ -91,6 +91,8 @@ export function NeumorphismDrawer({
                     ['浅灰', '#e0e0e0'],
                     ['暖白', '#ebe5dc'],
                     ['灰蓝', '#dce4ec'],
+                    ['晨光暖白', '#f3f3f8'],
+                    ['冷白', '#f3f5f8'],
                   ].map(([name, color]) => (
                     <button
                       key={color}

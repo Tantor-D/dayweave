@@ -1229,6 +1229,7 @@ function WorkbenchSettings({
   const [start, setStart] = useState(minuteLabel(preferences.dayStart));
   const [end, setEnd] = useState(minuteLabel(preferences.dayEnd));
   const [inherit, setInherit] = useState(preferences.inheritParentTags);
+  const [autoCompleteParents, setAutoCompleteParents] = useState(preferences.autoCompleteParents);
   const [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
   return (
@@ -1245,7 +1246,9 @@ function WorkbenchSettings({
         setError('');
         setBusy(true);
         try {
-          if (!(await update({ dayStart, dayEnd, inheritParentTags: inherit })))
+          if (
+            !(await update({ dayStart, dayEnd, inheritParentTags: inherit, autoCompleteParents }))
+          )
             setError('设置保存失败，请重试。');
         } finally {
           setBusy(false);
@@ -1271,6 +1274,17 @@ function WorkbenchSettings({
         />
       </label>
       <p className={s.hint}>仅调整时间轴显示与拖选范围，范围外排期保留。结束可填 24:00。</p>
+      <label className={s.checkRow}>
+        <input
+          type="checkbox"
+          checked={autoCompleteParents}
+          onChange={(e) => setAutoCompleteParents(e.target.checked)}
+        />
+        所有子任务完成后，自动完成父任务
+      </label>
+      <p className={s.hint}>
+        关闭后，父任务需手动标记完成。手动完成父任务仍会完成全部子任务；重新打开子任务仍会重新打开已完成的祖先。
+      </p>
       <label className={s.checkRow}>
         <input type="checkbox" checked={inherit} onChange={(e) => setInherit(e.target.checked)} />
         子任务复制继承父任务标签

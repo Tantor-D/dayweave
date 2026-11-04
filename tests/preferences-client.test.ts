@@ -34,6 +34,8 @@ test('legacy running backend responses retain statistics defaults on initial loa
   });
   const loaded = await readPreferences();
   assert.deepEqual(loaded.statistics, defaultStatistics);
+  assert.equal(loaded.showUntimed, false);
+  assert.equal((await savePreferences({ showUntimed: true })).showUntimed, true);
   assert.doesNotThrow(() =>
     statisticsRange(loaded.statistics, Date.parse('2026-11-03T12:00:00+08:00')),
   );

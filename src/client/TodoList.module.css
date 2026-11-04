@@ -16,13 +16,11 @@
   font-size: 30px;
 }
 .heading p,
-.empty,
-.name small {
+.empty {
   color: var(--muted);
   font-size: 13px;
 }
 .page button,
-.page select,
 .page input:not([type='checkbox']) {
   font: inherit;
   color: var(--text);
@@ -36,8 +34,7 @@
   cursor: pointer;
 }
 .page button:disabled,
-.page input:disabled,
-.page select:disabled {
+.page input:disabled {
   opacity: 0.55;
   cursor: default;
 }
@@ -68,7 +65,7 @@
 }
 .group {
   margin: 16px 0;
-  padding: 16px 20px;
+  padding: 12px 16px;
   background: var(--input);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -93,14 +90,14 @@
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  gap: 8px;
+  padding: 4px 0;
   border-top: 1px solid var(--line);
 }
 .grip {
   cursor: grab;
   color: var(--muted);
-  padding: 8px 2px;
+  padding: 4px 2px;
 }
 .page .row input[type='checkbox'] {
   width: 18px;
@@ -118,13 +115,8 @@
   padding: 3px 0;
   text-align: left;
   overflow-wrap: anywhere;
-}
-.name small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 4px;
+  font-size: 16px;
+  line-height: 1.4;
 }
 .name form {
   display: flex;
@@ -138,20 +130,16 @@
   text-decoration: line-through;
   opacity: 0.55;
 }
-.page .row select {
-  width: 140px;
-  font-size: 12px;
-}
-.page .date {
+.page .row .date {
   width: 145px;
-  font-size: 12px;
+  font-size: 13px;
+  padding: 4px 8px;
 }
 .empty {
   min-height: 18px;
   margin: 8px 0 0;
 }
-.rootTarget,
-.parentTarget {
+.rootTarget {
   padding: 12px;
   border: 1px dashed var(--accent);
   border-radius: 8px;
@@ -166,10 +154,9 @@
   border-radius: 4px;
   box-shadow: 3px 3px 0 var(--text);
 }
-@media (max-width: 900px) {
+@media (max-width: 600px) {
   .row {
     flex-wrap: wrap;
-    gap: 8px;
   }
   .name {
     flex-basis: calc(100% - 68px);
@@ -177,25 +164,31 @@
   .row .date {
     margin-left: 46px;
   }
-  .page .row select {
-    flex: 1;
-  }
   .group {
-    padding: 14px;
+    padding: 10px;
   }
 }
 
 .page .toolbar input[type='search'] {
   width: 240px;
 }
-.parentTarget {
-  flex-shrink: 0;
-  white-space: nowrap;
-  padding: 8px;
-  color: var(--muted);
-}
 .page .row .date {
   flex-shrink: 0;
+}
+
+.rootRow .title {
+  font-weight: 650;
+}
+.contextLabel {
+  width: 145px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.row[data-todo-depth]:not([data-todo-depth='0']) {
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
 }
 
 /* Clay changes the material while retaining the shared list's compact geometry. */

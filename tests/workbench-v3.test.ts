@@ -154,6 +154,10 @@ test('v2 startup migration backs up old colors/states; preferences persist and c
   assert.equal((snap.data as Workspace).tasks[0].status, 'todo');
   assert.equal((await store.history())[0].before, raw);
   const pref = await store.getPreferences();
+  assert.equal(pref.showUntimed, false);
+  await store.updatePreferences({ showUntimed: true });
+  assert.equal((await store.getPreferences()).showUntimed, true);
+  assert.equal(JSON.parse(await readFile(join(options.dataDir, 'preferences.json'), 'utf8')).showUntimed, true);
   assert.equal(pref.dayStart, 0);
   assert.equal(pref.dayEnd, 1440);
   assert.equal(pref.inheritParentTags, true);

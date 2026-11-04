@@ -619,3 +619,62 @@ test('read-only inspection does not overwrite damaged runtime snapshot files', a
   await f.store.read('daily/2026-11-03');
   assert.equal(await readFile(path, 'utf8'), '{ damaged snapshot');
 });
+
+test('parent auto-completion preference persists and governs previews across sources', async (t) => {
+  const f = await fixture(t);
+  assert.equal((await f.store.getPreferences()).autoCompleteParents, true);
+  await apply(f.store, [
+    { type: 'task.create', id: 'root', title: 'Root' },
+    { type: 'task.create', id: 'parent', title: 'Parent', parentId: 'root' },
+    { type: 'task.create', id: 'leaf', title: 'Leaf', parentId: 'parent' },
+  ]);
+  await f.store.updatePreferences({ autoCompleteParents: false });
+  for (const source of ['user', 'harness', 'web_ai'] as const) {
+    const p = await proposal(
+      f.store,
+      [{ type: 'task.update', id: 'leaf', patch: { status: 'done' } }],
+      source,
+    );
+    const next = JSON.parse(p.after) as Workspace;
+    assert.deepEqual(
+      next.tasks.map((task) => task.status),
+      ['todo', 'todo', 'done'],
+    );
+    assert.equal(next.tasks[1].completedAt, null);
+  }
+  await apply(f.store, [{ type: 'task.update', id: 'leaf', patch: { status: 'done' } }]);
+  await f.restart();
+  assert.equal((await f.store.getPreferences()).autoCompleteParents, false);
+  let w = (await f.store.read('workspace')).data as Workspace;
+  assert.deepEqual(
+    validateWorkspace(w).tasks.map((task) => task.status),
+    ['todo', 'todo', 'done'],
+  );
+  await apply(f.store, [{ type: 'task.update', id: 'parent', patch: { status: 'done' } }]);
+  w = (await f.store.read('workspace')).data as Workspace;
+  assert.deepEqual(
+    w.tasks.map((task) => task.status),
+    ['todo', 'done', 'done'],
+  );
+  await apply(f.store, [{ type: 'task.update', id: 'parent', patch: { status: 'todo' } }]);
+  await apply(f.store, [{ type: 'task.update', id: 'root', patch: { status: 'done' } }]);
+  await apply(f.store, [{ type: 'task.update', id: 'leaf', patch: { status: 'todo' } }]);
+  w = (await f.store.read('workspace')).data as Workspace;
+  assert.deepEqual(
+    w.tasks.map((task) => task.status),
+    ['todo', 'todo', 'todo'],
+  );
+  await f.store.updatePreferences({ autoCompleteParents: true });
+  await apply(f.store, [{ type: 'task.update', id: 'leaf', patch: { status: 'done' } }]);
+  w = (await f.store.read('workspace')).data as Workspace;
+  assert.deepEqual(
+    w.tasks.map((task) => task.status),
+    ['done', 'done', 'done'],
+  );
+  const preferencesPath = join(f.options.dataDir, 'preferences.json');
+  const legacy = JSON.parse(await readFile(preferencesPath, 'utf8'));
+  delete legacy.autoCompleteParents;
+  await writeFile(preferencesPath, serialize(legacy));
+  await f.restart();
+  assert.equal((await f.store.getPreferences()).autoCompleteParents, true);
+});

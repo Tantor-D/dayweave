@@ -65,7 +65,7 @@ export function validateWorkspace(value: unknown): Workspace {
     if (new Set(t.tagIds).size !== t.tagIds.length || t.tagIds.some((id) => !tags.has(id)))
       fail('任务标签重复或不存在');
     const children = w.tasks.filter((c) => c.parentId === t.id);
-    if (children.length && (t.status === 'done') !== children.every((c) => c.status === 'done'))
+    if (t.status === 'done' && children.some((c) => c.status !== 'done'))
       fail('父子任务完成状态不一致');
     if ((t.status === 'done') !== (t.completedAt !== null)) fail('完成状态与完成时间不一致');
     const dates = new Set<string>();
@@ -102,7 +102,9 @@ export function applyOperations(
   before: Workspace,
   operations: Operation[],
   now = new Date().toISOString(),
-  options = { inheritParentTags: true },
+  options: { inheritParentTags: boolean; autoCompleteParents?: boolean } = {
+    inheritParentTags: true,
+  },
 ): { workspace: Workspace; completionEvents: Change['completionEvents'] } {
   const w = structuredClone(before);
   const completionEvents: Change['completionEvents'] = [];
@@ -187,6 +189,7 @@ export function applyOperations(
               child.updatedAt = now;
             }
         } else if (
+          options.autoCompleteParents !== false &&
           op.patch.status &&
           w.tasks.some((child) => child.parentId === t.id) &&
           w.tasks
@@ -232,7 +235,7 @@ export function applyOperations(
       const children = w.tasks.filter((t) => t.parentId === parent.id);
       if (!children.length) continue;
       const done = children.every((t) => t.status === 'done');
-      if (done && parent.status !== 'done') {
+      if (options.autoCompleteParents !== false && done && parent.status !== 'done') {
         parent.status = 'done';
         parent.completedAt = now;
         parent.updatedAt = now;

@@ -32,6 +32,7 @@ interface Props {
   dayEnd: number;
   dates: string[];
   orientation: 'vertical' | 'horizontal';
+  showUntimed?: boolean;
   onSelect: (id: string) => void;
   onSchedule: (placement: Placement) => void;
   onDrag: DragStart;
@@ -46,6 +47,7 @@ export function Timeline({
   dayEnd,
   dates,
   orientation,
+  showUntimed = false,
   onSelect,
   onSchedule,
   onDrag,
@@ -180,7 +182,7 @@ export function Timeline({
       Math.max(
         daySizes[i],
         64 +
-          renderTasks.reduce(
+          (showUntimed ? renderTasks : []).reduce(
             (n, t) => n + t.placements.filter((p) => p.kind === 'day' && p.date === date).length,
             0,
           ) *
@@ -200,6 +202,7 @@ export function Timeline({
   const weekStyle = {
     '--day-count': dates.length,
     '--time-size': `${timeSize}px`,
+    '--date-column-width': showUntimed ? '150px' : '90px',
     '--grid-offset': `${(-(dayStart % 60) / 60) * (horizontal ? 90 : 56)}px`,
     '--day-columns': daySizes.map((n) => `minmax(${n}px, 1fr)`).join(' '),
     '--board-min-width': `${daySizes.reduce((a, b) => a + b, 56)}px`,
@@ -238,20 +241,22 @@ export function Timeline({
                   </div>
                 ))}
               </div>
-              <div className={s.allDayRow}>
-                <div className={s.allDayLabel}>未定时</div>
-                {dates.map((date) => (
-                  <DayDrop
-                    key={date}
-                    date={date}
-                    tasks={renderTasks}
-                    tags={tags}
-                    onDrag={onDrag}
-                    onSelect={onSelect}
-                    onSchedule={onSchedule}
-                  />
-                ))}
-              </div>
+              {showUntimed && (
+                <div className={s.allDayRow}>
+                  <div className={s.allDayLabel}>未定时</div>
+                  {dates.map((date) => (
+                    <DayDrop
+                      key={date}
+                      date={date}
+                      tasks={renderTasks}
+                      tags={tags}
+                      onDrag={onDrag}
+                      onSelect={onSelect}
+                      onSchedule={onSchedule}
+                    />
+                  ))}
+                </div>
+              )}
             </>
           )}
           {horizontal ? (
@@ -275,16 +280,18 @@ export function Timeline({
                     <b>
                       {date.slice(5)} {weekday(date)}
                     </b>
-                    <DayDrop
-                      date={date}
-                      tasks={renderTasks}
-                      allTasks={allTasks}
-                      hierarchical
-                      tags={tags}
-                      onDrag={onDrag}
-                      onSelect={onSelect}
-                      onSchedule={onSchedule}
-                    />
+                    {showUntimed && (
+                      <DayDrop
+                        date={date}
+                        tasks={renderTasks}
+                        allTasks={allTasks}
+                        hierarchical
+                        tags={tags}
+                        onDrag={onDrag}
+                        onSelect={onSelect}
+                        onSchedule={onSchedule}
+                      />
+                    )}
                   </div>
                   <div className={s.dayTimeScroll}>
                     <div

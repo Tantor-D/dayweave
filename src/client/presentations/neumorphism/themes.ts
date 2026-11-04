@@ -6,6 +6,7 @@ export function neumorphismTokens(
   settings: NeumorphismSettings = defaultNeumorphism,
 ): Record<string, string> & CSSProperties {
   const { background, accent, radius, distance, intensity, blur, light } = settings;
+  const dawn = background.toLowerCase() === '#f3f3f8';
   const channels = (color: string) => [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
   const shade = (factor: number) =>
     '#' +
@@ -32,6 +33,13 @@ export function neumorphismTokens(
     '--spacing': '16px',
     '--material-blur': '0px',
     '--bg': background,
+    '--neu-canvas': dawn
+      ? 'radial-gradient(ellipse at 0% 20%, #deddf0 0%, transparent 65%), radial-gradient(ellipse at 100% 0%, #f0e3df 0%, transparent 58%), radial-gradient(ellipse at 90% 100%, #dfeef3 0%, transparent 65%), #eceef2'
+      : background,
+    '--neu-wash': dawn
+      ? 'linear-gradient(135deg, #efedf866, #fff5ef55 48%, #e8f5f955)'
+      : 'none',
+    '--neu-heading': dawn ? 'transparent' : background,
     '--surface': background,
     '--solid': background,
     '--card': background,

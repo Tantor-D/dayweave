@@ -5,7 +5,13 @@ import type { Preferences } from '../domain/types.ts';
 
 // A dev server can serve the new client while its backend still returns pre-v0.4 preferences.
 function normalizePreferences(value: Preferences): Preferences {
-  return { ...value, neumorphism: value.neumorphism ?? { ...defaultNeumorphism }, statistics: value.statistics ?? structuredClone(defaultStatistics) };
+  return {
+    ...value,
+    showUntimed: value.showUntimed ?? false,
+    neumorphism: value.neumorphism ?? { ...defaultNeumorphism },
+    autoCompleteParents: value.autoCompleteParents ?? true,
+    statistics: value.statistics ?? structuredClone(defaultStatistics),
+  };
 }
 export const readPreferences = () => api<Preferences>('/preferences').then(normalizePreferences);
 export const savePreferences = (patch: Partial<Preferences>) =>

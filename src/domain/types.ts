@@ -127,6 +127,7 @@ export interface Preferences {
   theme: 'glass-light' | 'glass-dark' | 'neobrutalism-light' | 'claymorphism-light' | 'neumorphism-light';
   days: 1 | 3 | 7;
   orientation: 'vertical' | 'horizontal';
+  showUntimed: boolean;
   panelWidth: number;
   hiddenTags: string[];
   hiddenTasks: string[];
@@ -135,6 +136,7 @@ export interface Preferences {
   dayStart: number;
   dayEnd: number;
   inheritParentTags: boolean;
+  autoCompleteParents: boolean;
 }
 export interface ContextInput {
   startDate?: string;

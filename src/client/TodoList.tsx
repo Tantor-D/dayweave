@@ -1,16 +1,28 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { Workbench } from './application/useWorkbench';
 import type { Snapshot, Workspace } from '../domain/types';
-import { taskPath } from '../domain/tree';
-import { moveTodoDate, todoGroups, todoParentOptions, type TodoRange, type TodoRow } from './todo';
+import { ancestors, taskPath } from '../domain/tree';
+import {
+  moveTodoDate,
+  todoGroups,
+  todoTreeRows,
+  dropTodoSubtree,
+  type TodoRange,
+  type TodoTreeRow,
+} from './todo';
 import { today, weekday } from './time';
 import s from './TodoList.module.css';
 
-type Selection = TodoRow & { base: Snapshot<Workspace> };
+type Selection = TodoTreeRow & {
+  base: Snapshot<Workspace>;
+  rowKey: string;
+  sourceDates: string[];
+  fromUndated: boolean;
+};
 export function TodoList({ workbench: w }: { workbench: Workbench }) {
-  const [range, setRange] = useState<TodoRange>('today');
+  const [range, setRange] = useState<TodoRange>('next3');
   const [parents, setParents] = useState(false),
-    [completed, setCompleted] = useState(false);
+    [completed, setCompleted] = useState(true);
   const [overdueOpen, setOverdueOpen] = useState(true),
     [undatedOpen, setUndatedOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -47,9 +59,27 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
     completed,
     query,
   );
-  const selection = (row: TodoRow): Selection => ({ ...row, base: w.snapshot! });
+  const selection = (row: TodoTreeRow, rowKey: string, groupKey: string): Selection => ({
+    ...row,
+    base: w.snapshot!,
+    rowKey,
+    sourceDates: row.date
+      ? [row.date]
+      : /^\d{4}-\d{2}-\d{2}$/.test(groupKey)
+        ? [groupKey]
+        : groupKey === 'overdue'
+          ? overdue
+              .filter(
+                (hit) =>
+                  hit.task.id === row.task.id ||
+                  ancestors(hit.task, tasks).some((a) => a.id === row.task.id),
+              )
+              .map((hit) => hit.date!)
+          : [],
+    fromUndated: groupKey === 'undated',
+  });
   const moveDate = async (item: Selection, date: string) => {
-    if (!date || locked) return;
+    if (!date || locked || item.contextOnly) return;
     try {
       const ops = moveTodoDate(item.task, item.date, date);
       if (ops.length) await w.save(ops, '调整待办分配日期', item.base);
@@ -57,24 +87,25 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
       w.notify((error as Error).message, true);
     }
   };
-  const setParent = async (item: Selection, parentId: string | null) => {
-    if (locked || parentId === item.task.parentId) return;
-    if (
-      parentId &&
-      !todoParentOptions(item.task, item.base.data.tasks).some((t) => t.id === parentId)
-    ) {
-      w.notify('不能将任务归属到自身、后代或已归档任务。', true);
-      return;
+  const dropTask = async (item: Selection, targetDate?: string, parentId?: string | null) => {
+    if (locked) return;
+    try {
+      const operations = dropTodoSubtree(
+        item.task,
+        item.base.data.tasks,
+        item.sourceDates,
+        targetDate,
+        parentId,
+        item.fromUndated,
+      );
+      if (operations.length) await w.save(operations, '移动待办子树与叶节点日期', item.base);
+    } catch (error) {
+      w.notify((error as Error).message, true);
     }
-    await w.save(
-      [{ type: 'task.update', id: item.task.id, patch: { parentId } }],
-      '调整待办任务归属',
-      item.base,
-    );
   };
-  const target = (key: string, action: (item: Selection) => void) => ({
+  const target = (key: string, action: (item: Selection) => void, accepts = true) => ({
     onDragOver: (e: DragEvent) => {
-      if (!dragRef.current || locked) return;
+      if (!dragRef.current || locked || !accepts) return;
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
@@ -85,17 +116,30 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
       e.stopPropagation();
       const item = dragRef.current;
       cancelDrag();
-      if (item && !locked) action(item);
+      if (item && !locked && accepts) action(item);
     },
   });
-  const renderRow = (row: TodoRow) => {
+  const renderRow = (row: TodoTreeRow, groupKey: string) => {
     const task = row.task,
-      key = `${task.id}:${row.date ?? 'undated'}`;
-    const isEditing = editing?.task.id === task.id && editing.date === row.date;
+      key = `${groupKey}:${task.id}:${row.date ?? 'undated'}`;
+    const isEditing = editing?.rowKey === key;
     return (
       <div
         key={key}
-        className={`${s.row} ${task.status === 'done' ? s.done : ''}`}
+        className={`${s.row} ${row.depth === 0 ? s.rootRow : ''} ${task.status === 'done' ? s.done : ''} ${hover === key ? s.hover : ''}`}
+        {...target(
+          key,
+          (item) =>
+            void dropTask(
+              item,
+              row.date ?? (/^\d{4}-\d{2}-\d{2}$/.test(groupKey) ? groupKey : undefined),
+              task.id,
+            ),
+        )}
+        style={{ marginLeft: Math.min(row.depth, 8) * 18 }}
+        title={taskPath(task, tasks)}
+        data-todo-depth={row.depth}
+        data-todo-context={row.contextOnly}
         data-todo-task={task.id}
         data-todo-date={row.date ?? ''}
       >
@@ -105,9 +149,9 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
           role="button"
           tabIndex={0}
           aria-label={`拖动 ${task.title}`}
-          title="拖到日期分组改期，或拖到归属目标调整父任务"
+          title="拖到任务行调整归属；跨日期时只移动子树中叶节点的对应日期"
           onDragStart={(e) => {
-            const item = selection(row);
+            const item = selection(row, key, groupKey);
             dragRef.current = item;
             setDragging(item);
             e.dataTransfer.setData('text/plain', task.id);
@@ -173,48 +217,26 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
               className={s.title}
               disabled={locked || !!editing}
               onClick={() => {
-                setEditing(selection(row));
+                setEditing(selection(row, key, groupKey));
                 setTitle(task.title);
               }}
             >
               {task.title}
             </button>
           )}
-          {task.parentId && (
-            <small title={taskPath(task, tasks)}>
-              {taskPath(task, tasks).split(' / ').slice(0, -1).join(' / ')}
-            </small>
-          )}
         </div>
-        <input
-          className={s.date}
-          type="date"
-          aria-label={`分配日期 ${task.title}`}
-          value={row.date ?? ''}
-          disabled={locked || !!editing}
-          onChange={(e) => void moveDate(selection(row), e.target.value)}
-        />
-        <select
-          aria-label={`父任务 ${task.title}`}
-          value={task.parentId ?? ''}
-          disabled={locked || !!editing}
-          onChange={(e) => void setParent(selection(row), e.target.value || null)}
-        >
-          <option value="">一级任务</option>
-          {todoParentOptions(task, tasks).map((t) => (
-            <option key={t.id} value={t.id}>
-              {taskPath(t, tasks)}
-            </option>
-          ))}
-        </select>
-        {
-          <span
-            className={`${s.parentTarget} ${hover === key ? s.hover : ''}`}
-            {...target(key, (item) => void setParent(item, task.id))}
-          >
-            归属到此任务
-          </span>
-        }
+        {row.contextOnly ? (
+          <span className={s.contextLabel}>层级节点</span>
+        ) : (
+          <input
+            className={s.date}
+            type="date"
+            aria-label={`分配日期 ${task.title}`}
+            value={row.date ?? ''}
+            disabled={locked || !!editing}
+            onChange={(e) => void moveDate(selection(row, key, groupKey), e.target.value)}
+          />
+        )}
       </div>
     );
   };
@@ -256,7 +278,7 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
             disabled={!!editing}
             onChange={(e) => setParents(e.target.checked)}
           />
-          显示父任务
+          包含父任务自身日期
         </label>
         <label>
           <input
@@ -279,7 +301,7 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
       {
         <div
           className={`${s.rootTarget} ${hover === 'root' ? s.hover : ''}`}
-          {...target('root', (item) => void setParent(item, null))}
+          {...target('root', (item) => void dropTask(item, undefined, null))}
         >
           拖到这里设为一级任务（保留分配日期）
         </div>
@@ -293,20 +315,24 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
           {overdueOpen ? '▾' : '▸'} 过期 <span>{overdue.length}</span>
         </button>
         {overdueOpen &&
-          (overdue.length ? overdue.map(renderRow) : <p className={s.empty}>没有过期未完成事项</p>)}
+          (overdue.length ? (
+            todoTreeRows(overdue, tasks).map((row) => renderRow(row, 'overdue'))
+          ) : (
+            <p className={s.empty}>没有过期未完成事项</p>
+          ))}
       </section>
       {groups.map((group) => (
         <section
           key={group.date}
           data-todo-group={group.date}
           className={`${s.group} ${hover === group.date ? s.hover : ''}`}
-          {...target(group.date, (item) => void moveDate(item, group.date))}
+          {...target(group.date, (item) => void dropTask(item, group.date))}
         >
           <h2>
             {group.date === baseDate ? '今天 · ' : ''}
             {group.date} {weekday(group.date)} <span>{group.rows.length}</span>
           </h2>
-          {group.rows.map(renderRow)}
+          {todoTreeRows(group.rows, tasks).map((row) => renderRow(row, group.date))}
           <p className={s.empty}>
             {dragging ? '拖到此日期区域以修改分配日期' : group.rows.length ? '' : '暂无待办事项'}
           </p>
@@ -322,7 +348,7 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
         </button>
         {undatedOpen &&
           (undated.length ? (
-            undated.map(renderRow)
+            todoTreeRows(undated, tasks).map((row) => renderRow(row, 'undated'))
           ) : (
             <p className={s.empty}>没有未分配日期的事项</p>
           ))}

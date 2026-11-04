@@ -40,6 +40,7 @@ const defaults: Preferences = {
   theme: 'glass-light',
   days: 3,
   orientation: 'vertical',
+  showUntimed: false,
   panelWidth: 300,
   hiddenTags: [],
   hiddenTasks: [],
@@ -48,6 +49,7 @@ const defaults: Preferences = {
   dayStart: 0,
   dayEnd: 1440,
   inheritParentTags: true,
+  autoCompleteParents: true,
 };
 export const hashContent = (content: string | null): string | null =>
   content === null ? null : createHash('sha256').update(content, 'utf8').digest('hex');
@@ -458,8 +460,10 @@ export class Store {
       this.assertBase(current, value.baseHash, value.baseRevision);
       let after: string;
       if (value.target === 'workspace') {
+        const preferences = await this.getPreferences();
         const result = applyOperations(current.data as Workspace, value.operations, this.now(), {
-          inheritParentTags: (await this.getPreferences()).inheritParentTags,
+          inheritParentTags: preferences.inheritParentTags,
+          autoCompleteParents: preferences.autoCompleteParents,
         });
         result.workspace.revision++;
         after = serialize(result.workspace);
@@ -877,6 +881,8 @@ function parsePreferences(value: Record<string, unknown>): Preferences {
     dayStart: 0,
     dayEnd: 1440,
     inheritParentTags: true,
+    autoCompleteParents: true,
+    showUntimed: false,
     ...value,
     hiddenStatuses: [
       ...new Set((value.hiddenStatuses as string[]).map((s) => (s === 'in_progress' ? 'todo' : s))),
