@@ -22,7 +22,6 @@ import {
   Plus,
   Search,
   Settings,
-  Sparkles,
   Sun,
   X,
 } from 'lucide-react';
@@ -39,7 +38,6 @@ import { api, commit, readWorkspace } from './api';
 import { Timeline, useScheduleDrag } from './Timeline';
 import { ScheduleDialog } from './ScheduleDialog';
 import {
-  AiPanel,
   BackgroundPanel,
   ExternalNotice,
   FilterPanel,
@@ -77,7 +75,6 @@ const initialPreferences: Preferences = {
 };
 type Panel =
   | 'task'
-  | 'ai'
   | 'background'
   | 'review'
   | 'history'
@@ -87,7 +84,6 @@ type Panel =
   | 'proposals';
 const panelTitles: Record<Panel, string> = {
   task: '任务详情',
-  ai: 'AI 协作',
   background: 'AI 背景',
   review: '每日回望',
   history: '修改历史',
@@ -501,17 +497,6 @@ export default function App() {
               >
                 <Settings size={17} />
               </button>
-              <button
-                className={s.aiButton}
-                onClick={() => {
-                  setView('workbench');
-                  if (view === 'statistics') setPanel('ai');
-                  else togglePanel('ai');
-                }}
-              >
-                <Sparkles size={15} />
-                AI 协作
-              </button>
             </nav>
           </header>
           {!workspace ? (
@@ -795,23 +780,12 @@ export default function App() {
                       {panel === 'history' && <HistoryPanel notify={notify} refresh={refresh} />}
                       {panel === 'settings' && (
                         <SettingsPanel
-                          notify={notify}
-                          onSettings={() => void refresh()}
                           preferences={preferences}
                           updatePreferences={updatePreferences}
                         />
                       )}
                       {panel === 'proposals' && (
                         <ProposalsPanel proposals={proposals} refresh={refresh} notify={notify} />
-                      )}
-                      {panel === 'ai' && (
-                        <AiPanel
-                          workspace={workspace}
-                          dates={dates}
-                          notify={notify}
-                          refresh={refresh}
-                          onProposals={() => setPanel('proposals')}
-                        />
                       )}
                     </aside>
                   )

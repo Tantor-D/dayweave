@@ -1,6 +1,6 @@
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm, mkdir, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -165,7 +165,7 @@ test('empty initialization, persistence, revision, real history and request-id b
   assert.equal(((await f.store.read('workspace')).data as Workspace).tasks[0].title, '持久任务');
   assert.equal((await f.store.submit(p.id, requestId, 'user')).changeId, applied.changeId);
 });
-test('approval: defaults, persistent pending proposals, latest policy and conflict', async (t) => {
+test('approval: defaults, persistent pending proposals, CLI confirmation and conflict', async (t) => {
   const f = await fixture(t);
   const p = await proposal(f.store, [{ type: 'task.create', title: 'AI' }], 'harness');
   assert.equal(
@@ -175,21 +175,17 @@ test('approval: defaults, persistent pending proposals, latest policy and confli
   assert.equal((await f.store.read('workspace')).revision, 0);
   await f.restart();
   assert.equal((await f.store.proposals())[0].status, 'pending_confirmation');
-  await assert.rejects(f.store.submit(p.id, randomUUID(), 'harness', true), /网页用户/);
-  await f.store.updateSettings({ approvalMode: 'auto_accept' });
   assert.equal((await f.store.read('workspace')).revision, 0);
-  assert.equal((await f.store.submit(p.id, randomUUID(), 'harness')).status, 'applied');
-  assert.equal((await f.store.history())[0].approval, 'auto_accept');
+  assert.equal((await f.store.submit(p.id, randomUUID(), 'harness', true)).status, 'applied');
+  assert.equal((await f.store.history())[0].approval, 'cli_confirmation');
   const conflict = await proposal(f.store, [{ type: 'task.create', title: '旧提案' }], 'web_ai');
   await apply(f.store, [{ type: 'task.create', title: '新任务' }]);
   assert.equal((await f.store.submit(conflict.id, randomUUID(), 'user', true)).status, 'conflict');
   assert.equal(((await f.store.read('workspace')).data as Workspace).tasks.length, 2);
 });
-test('approval: switching to confirmation after preview and manual confirmation source', async (t) => {
+test('approval: legacy web AI proposals retain manual confirmation', async (t) => {
   const f = await fixture(t);
-  await f.store.updateSettings({ approvalMode: 'auto_accept' });
   const p = await proposal(f.store, [{ type: 'task.create', title: 'AI' }], 'web_ai');
-  await f.store.updateSettings({ approvalMode: 'require_confirmation' });
   assert.equal((await f.store.submit(p.id, randomUUID(), 'web_ai')).status, 'pending_confirmation');
   assert.equal((await f.store.submit(p.id, randomUUID(), 'user')).status, 'pending_confirmation');
   assert.equal((await f.store.submit(p.id, randomUUID(), 'user', true)).status, 'applied');
@@ -309,12 +305,8 @@ test('document targets, schema-version and unknown operation rejection', async (
   const invalid = { ...emptyWorkspace(), schemaVersion: 9 };
   assert.throws(() => validateWorkspace(invalid));
 });
-test('secrets are outside data, permission restricted, masked and preferences durable', async (t) => {
+test('preferences remain durable without model settings', async (t) => {
   const f = await fixture(t);
-  await f.store.updateSettings({ apiKey: 'simulated-secret', model: 'mock' });
-  assert.equal((await f.store.getSettings()).hasApiKey, true);
-  assert.ok(!JSON.stringify(await f.store.getSettings()).includes('simulated-secret'));
-  assert.equal((await stat(join(f.options.localDir, 'secrets.json'))).mode & 0o777, 0o600);
   await f.store.updatePreferences({ theme: 'glass-dark', hiddenTags: ['personal'], days: 7 });
   await f.restart();
   assert.equal((await f.store.getPreferences()).theme, 'glass-dark');
@@ -420,9 +412,8 @@ test('text proposals follow AI policy and cross-document dependency waits for su
   );
   assert.equal((await f.store.read('short-term')).data, '');
   await f.store.submit(first.id, randomUUID(), 'user', true);
-  await f.store.updateSettings({ approvalMode: 'auto_accept' });
-  assert.equal((await f.store.submit(next.id, randomUUID(), 'harness')).status, 'applied');
-  assert.equal((await f.store.history('short-term'))[0].approval, 'auto_accept');
+  assert.equal((await f.store.submit(next.id, randomUUID(), 'harness', true)).status, 'applied');
+  assert.equal((await f.store.history('short-term'))[0].approval, 'cli_confirmation');
 });
 test('serial writes apply only one of two proposals from same base', async (t) => {
   const f = await fixture(t);
@@ -512,7 +503,6 @@ test('proposal rejection persists and cannot be silently applied later', async (
   await f.store.submit(p.id, randomUUID(), 'harness');
   await f.store.reject(p.id);
   await f.restart();
-  await f.store.updateSettings({ approvalMode: 'auto_accept' });
   assert.equal((await f.store.submit(p.id, randomUUID(), 'harness')).status, 'rejected');
   assert.equal((await f.store.read('short-term')).data, '');
   assert.equal((await f.store.history()).length, 0);

@@ -219,18 +219,6 @@
   color: var(--muted);
   white-space: nowrap;
 }
-.headerActions .aiButton {
-  background: var(--accent);
-  color: var(--on-accent);
-  padding: 10px 15px;
-  margin-left: 3px;
-  border-radius: 12px;
-  border-color: var(--accent);
-}
-.headerActions .aiButton:hover {
-  background: color-mix(in srgb, var(--accent), var(--text) 12%);
-  color: var(--on-accent);
-}
 .layout {
   display: flex;
   flex: 1;
@@ -1067,8 +1055,7 @@
   flex-direction: column;
   gap: 14px;
 }
-.form label,
-.contextPicker label:not(.checkRow) {
+.form label {
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -1396,92 +1383,6 @@
 .infoBox p:last-child {
   margin-bottom: 0;
 }
-.contextPicker {
-  padding: 11px;
-  border: 1px solid var(--line);
-  background: var(--solid);
-  border-radius: 9px;
-  font-size: 11px;
-  color: var(--muted);
-  margin: 16px 0;
-}
-.contextPicker > summary {
-  cursor: pointer;
-}
-.contextPicker > label {
-  margin-top: 13px;
-}
-.contextPicker .hint {
-  margin: 12px 0 0;
-}
-.contextPicker .checkRow {
-  font-size: 10px;
-}
-.contextPicker h3 {
-  font-size: 11px;
-}
-.messages {
-  min-height: 160px;
-  margin: 16px 0;
-}
-.message {
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px 12px 12px 2px;
-  background: var(--card);
-  margin: 12px 0;
-  font-size: 12px;
-  line-height: 1.8;
-}
-.message small {
-  font-size: 9px;
-  color: var(--muted);
-}
-.message p {
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 6px 0 0;
-}
-.userMessage {
-  background: var(--accent-soft);
-  border-radius: 12px 12px 2px 12px;
-  margin-left: 25px;
-}
-.aiEmpty {
-  text-align: center;
-  padding: 20px 0;
-  color: var(--muted);
-}
-.aiEmpty > span {
-  font-size: 40px;
-  font-weight: 200;
-  color: var(--accent);
-}
-.aiEmpty h3 {
-  font-size: 13px;
-  font-weight: 500;
-  margin: 15px 0 10px;
-}
-.aiEmpty p {
-  font-size: 11px;
-  line-height: 1.9;
-}
-.chatForm {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--input);
-}
-.chatForm textarea {
-  border: 0;
-  background: transparent;
-  resize: vertical;
-}
-.chatForm > div {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 9px 9px;
-}
 .warning,
 .globalWarning {
   background: color-mix(in srgb, #e8bf72, var(--solid) 83%);
@@ -1716,11 +1617,6 @@
     font-size: 0;
     gap: 0;
     padding: 8px;
-  }
-  .headerActions .aiButton {
-    font-size: 11px;
-    gap: 5px;
-    padding: 9px 11px;
   }
   .headerActions button > span {
     font-size: 17px;

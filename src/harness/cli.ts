@@ -20,13 +20,18 @@ const HELP = {
     read: '读取 workspace（默认）或 long-term / short-term / daily/YYYY-MM-DD / notes/id',
     context: 'stdin / --file: {startDate?,endDate?,taskIds?,reflections?}，每次包含最新两类背景',
     preview: 'stdin / --file: {target,baseHash,baseRevision?,operations,summary?,dependsOn?}',
+    confirm: 'proposalId --request-id id：仅在用户确认已展示的具体差异后调用，记录 CLI 确认',
+    proposals: '列出持久化提案',
+    proposal: 'proposalId：读取提案真实前后差异及状态',
+    documents: 'stdin / --file: {kind?,startDate?,endDate?,offset?,limit?}，分页列出反思',
+    search: 'stdin / --file: {query,kind?,startDate?,endDate?,offset?,limit?}，关键词检索反思',
     submit: 'proposalId 或 stdin / --file: {proposalId,requestId}，显式 requestId 可安全重试',
     history: '可选 target，只读取历史，不默认加入 AI 上下文',
     restore: 'stdin / --file: {changeId,side:"before"|"after",baseHash}，生成恢复提案，仍需 submit',
     schema: '读取共享 JSON Schema',
   },
   approval:
-    '本工具始终标识为外部 AI；默认返回 pending_confirmation，须在网页确认。工具不能更改审批或密钥。',
+    '本工具始终标识为外部 AI；普通提交返回 pending_confirmation；展示差异并取得聊天确认后使用 confirm，也可在网页确认。服务端信任 CLI 识别真人确认。',
 };
 
 type IO = { input: () => Promise<string>; output: (value: unknown) => void };
@@ -105,13 +110,21 @@ export async function runCLI(
       );
     }
     if (!token) throw new CLIError('SERVICE_NOT_RUNNING', '工具凭据为空，请重新启动工作台服务。');
-    const needsBody = ['context', 'preview', 'submit', 'restore'].includes(command);
+    const needsBody = [
+      'context',
+      'preview',
+      'submit',
+      'confirm',
+      'restore',
+      'documents',
+      'search',
+    ].includes(command);
     let payload: Record<string, unknown> = {};
     if (needsBody) {
       const raw =
         flags['--file'] && flags['--file'] !== '-'
           ? await readFile(resolve(flags['--file']), 'utf8')
-          : parameter && command === 'submit'
+          : parameter && ['submit', 'confirm'].includes(command)
             ? ''
             : await io.input();
       if (raw.trim()) {
@@ -130,6 +143,22 @@ export async function runCLI(
     let body: Record<string, unknown> | undefined;
     let method = 'GET';
     switch (command) {
+      case 'documents':
+      case 'search':
+        if (command === 'search' && (typeof payload.query !== 'string' || !payload.query.trim()))
+          throw new CLIError('USAGE', 'search 需要非空 query。');
+        path = '/api/documents/query';
+        method = 'POST';
+        body = payload;
+        break;
+      case 'proposals':
+        path = '/api/proposals';
+        break;
+      case 'proposal':
+        if (!parameter || !/^[A-Za-z0-9_-]{1,120}$/.test(parameter))
+          throw new CLIError('USAGE', 'proposal 需要有效 proposalId。');
+        path = `/api/proposals/${encodeURIComponent(parameter)}`;
+        break;
       case 'read':
         path =
           !parameter || parameter === 'workspace'
@@ -157,12 +186,15 @@ export async function runCLI(
         method = 'POST';
         body = payload;
         break;
+      case 'confirm':
       case 'submit': {
         const proposalId = parameter ?? payload.proposalId;
         if (typeof proposalId !== 'string' || !/^[A-Za-z0-9_-]{1,120}$/.test(proposalId))
-          throw new CLIError('USAGE', 'submit 需要有效 proposalId。');
+          throw new CLIError('USAGE', `${command} 需要有效 proposalId。`);
+        if (command === 'confirm' && !flags['--request-id'] && !payload.requestId)
+          throw new CLIError('USAGE', 'confirm 必须提供 requestId，以便安全重试。');
         const requestId = flags['--request-id'] ?? payload.requestId ?? randomUUID();
-        path = `/api/proposals/${encodeURIComponent(proposalId)}/submit`;
+        path = `/api/proposals/${encodeURIComponent(proposalId)}/${command}`;
         method = 'POST';
         body = { requestId };
         break;

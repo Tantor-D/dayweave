@@ -1,5 +1,4 @@
 export type Source = 'user' | 'web_ai' | 'harness' | 'external';
-export type ApprovalMode = 'require_confirmation' | 'auto_accept';
 export type Target =
   'workspace' | 'long-term' | 'short-term' | `daily/${string}` | `notes/${string}`;
 export type Placement =
@@ -135,13 +134,6 @@ export interface Preferences {
   dayEnd: number;
   inheritParentTags: boolean;
 }
-export interface UserSettings {
-  approvalMode: ApprovalMode;
-  baseUrl: string;
-  model: string;
-  hasApiKey: boolean;
-  toolSupport: 'auto' | 'enabled' | 'disabled';
-}
 export interface ContextInput {
   startDate?: string;
   endDate?: string;
@@ -154,17 +146,4 @@ export interface ContextData {
   workspace: Snapshot<Workspace>;
   reflections: Snapshot<string>[];
   scope: { taskIds: string[]; startDate?: string; endDate?: string };
-}
-export interface ChatInput extends ContextInput {
-  message: string;
-  conversationId?: string;
-  requestId: string;
-}
-export interface ChatResult {
-  conversationId: string;
-  text: string;
-  proposals: Proposal[];
-  toolCapability: 'enabled' | 'disabled';
-  warning?: string;
-  scope: ContextData['scope'];
 }

@@ -6,14 +6,14 @@ import { resolve } from 'node:path';
 import type { ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { Store } from './store.ts';
-import { AIService, buildContext, contextSchema, chatSchema } from './ai.ts';
+import { buildContext, contextSchema } from './context.ts';
+import { documentQuerySchema, queryDocuments } from './documents.ts';
 import { operationSchema, workspaceSchema, previewSchema, targetSchema } from '../domain/schema.ts';
 import { validDate } from '../domain/operations.ts';
 import type {
   Target,
   Source,
   ContextInput,
-  ChatInput,
   Workspace,
   Snapshot,
   Task,
@@ -48,11 +48,9 @@ export async function buildApp(options: AppOptions) {
     localDir: resolve(options.localDir),
   });
   const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
-  const ai = new AIService(store);
   const clients = new Set<ServerResponse>();
   let watcher: ReturnType<typeof setInterval> | undefined;
   app.addHook('preClose', async () => {
-    ai.close();
     for (const client of clients) client.end();
   });
   app.addHook('onClose', async () => {
@@ -189,6 +187,9 @@ export async function buildApp(options: AppOptions) {
     app.get('/api/session', async () => ({ token: browserToken }));
     app.get('/api/workspace', async () => read('workspace'));
     app.get('/api/documents/list', async () => store.listDocuments());
+    app.post('/api/documents/query', async (req) =>
+      queryDocuments(store, documentQuerySchema.parse(req.body)),
+    );
     app.get('/api/documents', async (req) => {
       const target = targetSchema.parse((req.query as { target?: string }).target) as Target;
       if (target === 'workspace') throw httpError('VALIDATION', '请通过工作数据接口读取 workspace');
@@ -203,12 +204,21 @@ export async function buildApp(options: AppOptions) {
       store.preview(previewSchema.parse(req.body) as PreviewInput, source(req)),
     );
     app.get('/api/proposals', async () => store.proposals());
+    app.get<{ Params: { id: string } }>('/api/proposals/:id', async (req) => {
+      const proposal = (await store.proposals()).find((p) => p.id === req.params.id);
+      if (!proposal) throw httpError('NOT_FOUND', '提案不存在', 404);
+      return proposal;
+    });
     app.post<{ Params: { id: string } }>('/api/proposals/:id/submit', async (req) =>
       store.submit(req.params.id, requestSchema.parse(req.body).requestId, source(req)),
     );
     app.post<{ Params: { id: string } }>('/api/proposals/:id/confirm', async (req) => {
-      userOnly(req);
-      return store.submit(req.params.id, requestSchema.parse(req.body).requestId, 'user', true);
+      return store.submit(
+        req.params.id,
+        requestSchema.parse(req.body).requestId,
+        source(req),
+        true,
+      );
     });
     app.post<{ Params: { id: string } }>('/api/proposals/:id/reject', async (req) => {
       userOnly(req);
@@ -252,27 +262,9 @@ export async function buildApp(options: AppOptions) {
       userOnly(req);
       return store.updatePreferences(req.body as never);
     });
-    app.get('/api/settings', async (req) => {
-      userOnly(req);
-      return store.getSettings();
-    });
-    app.patch('/api/settings', async (req) => {
-      userOnly(req);
-      return store.updateSettings(req.body as never);
-    });
     app.post('/api/context', async (req) =>
       buildContext(store, contextSchema.parse(req.body) as ContextInput),
     );
-    app.post('/api/chat', async (req) => {
-      userOnly(req);
-      const input = chatSchema.parse(req.body);
-      return ai.chat(input as ChatInput);
-    });
-    app.post('/api/chat/cancel', async (req) => {
-      userOnly(req);
-      ai.cancel(requestSchema.parse(req.body).requestId);
-      return { cancelled: true };
-    });
     app.get('/api/review', async (req) => {
       const date = z
         .string()
@@ -331,7 +323,7 @@ export async function buildApp(options: AppOptions) {
     app.setNotFoundHandler((_req, reply) =>
       reply.code(404).send({ error: { code: 'NOT_FOUND', message: '接口或文件不存在' } }),
     );
-    return { app, store, ai };
+    return { app, store };
   } catch (error) {
     await app.close();
     throw error;

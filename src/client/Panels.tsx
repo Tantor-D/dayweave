@@ -15,14 +15,11 @@ import {
   LoaderCircle,
   Plus,
   RotateCcw,
-  Send,
-  Square,
   Trash2,
   X,
 } from 'lucide-react';
 import type {
   Change,
-  ChatResult,
   Operation,
   Placement,
   Preferences,
@@ -30,11 +27,10 @@ import type {
   Snapshot,
   Target,
   Task,
-  UserSettings,
   Workspace,
 } from '../domain/types';
 import { api, commit, readDocument } from './api';
-import { clockLabel, localInput, localToUTC, today, taskOnDay } from './time';
+import { clockLabel, localInput, localToUTC, today } from './time';
 import s from './App.module.css';
 export const statusLabels = { todo: '未完成', done: '已完成' };
 export type Save = (operations: Operation[], summary: string) => Promise<boolean>;
@@ -1109,147 +1105,16 @@ export function HistoryPanel({
   );
 }
 export function SettingsPanel({
-  notify,
-  onSettings,
   preferences,
   updatePreferences,
 }: {
-  notify: Notify;
-  onSettings: () => void;
   preferences: Preferences;
   updatePreferences: (patch: Partial<Preferences>) => Promise<boolean>;
 }) {
-  const [settings, setSettings] = useState<UserSettings>(),
-    [apiKey, setKey] = useState(''),
-    [busy, setBusy] = useState(false);
-  useEffect(() => {
-    void api<UserSettings>('/settings')
-      .then(setSettings)
-      .catch((e) => notify(e.message, true));
-  }, []);
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!settings) return;
-    setBusy(true);
-    try {
-      setSettings(
-        await api<UserSettings>(
-          '/settings',
-          {
-            approvalMode: settings.approvalMode,
-            baseUrl: settings.baseUrl,
-            model: settings.model,
-            toolSupport: settings.toolSupport,
-            ...(apiKey ? { apiKey } : {}),
-          },
-          'PATCH',
-        ),
-      );
-      setKey('');
-      notify('设置已保存');
-      onSettings();
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setBusy(false);
-    }
-  };
-  if (!settings) return <div className={s.panelContent}>正在读取设置…</div>;
   return (
     <div className={s.panelContent}>
       <h2>工作台设置</h2>
       <WorkbenchSettings preferences={preferences} update={updatePreferences} />
-      <h3>AI 与本机设置</h3>
-      <form className={s.form} onSubmit={(e) => void submit(e)}>
-        <label>
-          AI 写入策略
-          <select
-            aria-label="AI 写入策略"
-            value={settings.approvalMode}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                approvalMode: e.target.value as UserSettings['approvalMode'],
-              })
-            }
-          >
-            <option value="require_confirmation">必须网页确认（默认）</option>
-            <option value="auto_accept">自动接受</option>
-          </select>
-        </label>
-        <p className={s.hint}>
-          网页 AI
-          与外部工具共用此策略。自动接受仍校验版本并保留可恢复历史；已有待确认提案不会批量执行。
-        </p>
-        <label>
-          API 基础地址
-          <input
-            type="url"
-            placeholder="https://api.example.com/v1"
-            value={settings.baseUrl}
-            onChange={(e) => setSettings({ ...settings, baseUrl: e.target.value })}
-          />
-        </label>
-        <label>
-          模型名
-          <input
-            placeholder="供应商提供的模型名称"
-            value={settings.model}
-            onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-          />
-        </label>
-        <label>
-          API 密钥 <small>{settings.hasApiKey ? '已配置；留空保留' : '尚未配置'}</small>
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={apiKey}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="仅保存在本机服务端"
-          />
-        </label>
-        <label>
-          结构化工具能力
-          <select
-            value={settings.toolSupport}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                toolSupport: e.target.value as UserSettings['toolSupport'],
-              })
-            }
-          >
-            <option value="auto">自动探测</option>
-            <option value="enabled">启用工具调用</option>
-            <option value="disabled">仅文字聊天</option>
-          </select>
-        </label>
-        <button className={s.primary} disabled={busy}>
-          保存设置
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            void api<UserSettings>('/settings', { apiKey: '' }, 'PATCH')
-              .then((v) => {
-                setSettings(v);
-                notify('密钥已清除');
-              })
-              .catch((e) => notify(e.message, true))
-          }
-        >
-          清除已存密钥
-        </button>
-      </form>
-      <section className={s.infoBox}>
-        <h3>你的文件，始终可读</h3>
-        <p>
-          任务与排期在 <code>data/workspace.json</code>，背景与反思为 Markdown。外部 AI 可通过
-          harness 读取上下文、提交提案。
-        </p>
-        <code>npm run harness -- context</code>
-        <p>模型请求会发送本次选定的上下文到配置接口。文件保存在本机，不代表模型推理也在本机。</p>
-      </section>
     </div>
   );
 }
@@ -1340,226 +1205,6 @@ export function ProposalsPanel({
     </div>
   );
 }
-export function AiPanel({
-  workspace,
-  dates,
-  notify,
-  refresh,
-  onProposals,
-}: {
-  workspace: Workspace;
-  dates: string[];
-  notify: Notify;
-  refresh: () => Promise<void>;
-  onProposals: () => void;
-}) {
-  const [settings, setSettings] = useState<UserSettings>(),
-    [scope, setScope] = useState<'view' | 'all' | 'custom'>('view'),
-    [selectedTasks, setTasks] = useState<string[]>([]),
-    [docs, setDocs] = useState<{ target: Target; title: string }[]>([]),
-    [reflections, setReflections] = useState<Target[]>([]),
-    [message, setMessage] = useState(''),
-    [messages, setMessages] = useState<{ role: 'user' | 'assistant'; text: string }[]>([]),
-    [conversationId, setConversation] = useState<string>(),
-    [requestId, setRequest] = useState<string>(),
-    [warning, setWarning] = useState('');
-  useEffect(() => {
-    void api<UserSettings>('/settings')
-      .then(setSettings)
-      .catch((e) => notify(e.message, true));
-    void api<typeof docs>('/documents/list')
-      .then(setDocs)
-      .catch((e) => notify(e.message, true));
-  }, []);
-  const inView = workspace.tasks
-    .filter((t) => !t.archivedAt && dates.some((date) => taskOnDay(t, date)))
-    .map((t) => t.id);
-  const ids =
-    scope === 'all'
-      ? workspace.tasks.map((t) => t.id)
-      : scope === 'custom'
-        ? selectedTasks
-        : inView;
-  const send = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || requestId) return;
-    const id = crypto.randomUUID(),
-      text = message;
-    setRequest(id);
-    setMessages((v) => [...v, { role: 'user', text }]);
-    setMessage('');
-    try {
-      const result = await api<ChatResult>('/chat', {
-        message: text,
-        conversationId,
-        requestId: id,
-        taskIds: ids,
-        reflections,
-        startDate: dates[0],
-        endDate: dates[dates.length - 1],
-      });
-      setConversation(result.conversationId);
-      setMessages((v) => [
-        ...v,
-        {
-          role: 'assistant',
-          text:
-            result.text ||
-            (result.proposals.length ? '已生成结构化变更，请查看提案。' : '模型没有返回文字。'),
-        },
-      ]);
-      setWarning(
-        result.warning ??
-          (result.toolCapability === 'disabled'
-            ? '此接口当前仅支持文字建议，结构化应用已禁用。'
-            : ''),
-      );
-      if (result.proposals.length) {
-        await refresh();
-        notify(`生成 ${result.proposals.length} 条提案`);
-      }
-    } catch (e) {
-      notify((e as Error).message, true);
-      setMessages((v) => [
-        ...v,
-        { role: 'assistant', text: `请求未完成：${(e as Error).message}` },
-      ]);
-    } finally {
-      setRequest(undefined);
-    }
-  };
-  return (
-    <div className={s.panelContent}>
-      <h2>一起理清下一步</h2>
-      <p className={s.hint}>
-        {settings?.baseUrl || '尚未配置模型接口'}
-        <br />
-        长期背景、短期安排每次加载；反思由你选择。
-      </p>
-      <details className={s.contextPicker}>
-        <summary>
-          本次上下文 · {ids.length} 个任务 · {reflections.length} 篇反思
-        </summary>
-        <label>
-          任务范围
-          <select
-            aria-label="AI 任务范围"
-            value={scope}
-            onChange={(e) => setScope(e.target.value as typeof scope)}
-          >
-            <option value="view">当前日期范围关联任务</option>
-            <option value="all">全部任务</option>
-            <option value="custom">自选任务</option>
-          </select>
-        </label>
-        {scope === 'custom' &&
-          workspace.tasks.map((t) => (
-            <label key={t.id} className={s.checkRow}>
-              <input
-                type="checkbox"
-                checked={selectedTasks.includes(t.id)}
-                onChange={(e) =>
-                  setTasks((v) => (e.target.checked ? [...v, t.id] : v.filter((id) => id !== t.id)))
-                }
-              />
-              {t.title}
-            </label>
-          ))}
-        <p className={s.hint}>
-          {ids.map((id) => workspace.tasks.find((t) => t.id === id)?.title).join('、') ||
-            '尚无关联任务，可扩大范围。'}
-        </p>
-        <h3>仅本次选择的反思</h3>
-        {docs
-          .filter((d) => d.target.startsWith('daily/') || d.target.startsWith('notes/'))
-          .map((d) => (
-            <label key={d.target} className={s.checkRow}>
-              <input
-                type="checkbox"
-                checked={reflections.includes(d.target)}
-                onChange={(e) => {
-                  setReflections((v) =>
-                    e.target.checked ? [...v, d.target] : v.filter((t) => t !== d.target),
-                  );
-                  if (!e.target.checked && conversationId)
-                    setWarning('当前会话已有的讨论可能包含该反思内容；可新建会话，避免继续携带。');
-                }}
-              />
-              {d.title}
-            </label>
-          ))}
-      </details>
-      <div className={s.buttonRow}>
-        <button
-          onClick={() => {
-            setConversation(undefined);
-            setMessages([]);
-            setWarning('');
-          }}
-          disabled={!!requestId}
-        >
-          <Plus size={14} />
-          新建会话
-        </button>
-        <button onClick={onProposals}>查看变更提案</button>
-      </div>
-      {warning && <p className={s.warning}>{warning}</p>}
-      <div className={s.messages}>
-        {messages.length === 0 && (
-          <div className={s.aiEmpty}>
-            <span>✧</span>
-            <h3>从一个小问题开始</h3>
-            <p>
-              “帮我看看今天的安排。”
-              <br />
-              “把这个任务拆成几个步骤。”
-            </p>
-          </div>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={`${s.message} ${m.role === 'user' ? s.userMessage : ''}`}>
-            <small>{m.role === 'user' ? '你' : 'AI'}</small>
-            <p>{m.text}</p>
-          </div>
-        ))}
-        {requestId && (
-          <p className={s.hint}>
-            <LoaderCircle size={14} className={s.spin} />
-            正在思考，可随时取消…
-          </p>
-        )}
-      </div>
-      <form className={s.chatForm} onSubmit={(e) => void send(e)}>
-        <textarea
-          aria-label="AI 消息"
-          rows={3}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="说说你想整理的事情…"
-        />
-        <div>
-          {requestId ? (
-            <button
-              type="button"
-              onClick={() =>
-                void api('/chat/cancel', { requestId }).catch((e) => notify(e.message, true))
-              }
-            >
-              <Square size={13} />
-              取消请求
-            </button>
-          ) : (
-            <button className={s.primary} disabled={!message.trim()}>
-              <Send size={14} />
-              发送
-            </button>
-          )}
-        </div>
-      </form>
-    </div>
-  );
-}
-
 function WorkbenchSettings({
   preferences,
   update,

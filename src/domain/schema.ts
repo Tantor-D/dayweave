@@ -139,13 +139,6 @@ export const preferencesSchema = z.strictObject({
   dayEnd: z.number().int().min(1).max(1440),
   inheritParentTags: z.boolean(),
 });
-export const settingsPatchSchema = z.strictObject({
-  approvalMode: z.enum(['require_confirmation', 'auto_accept']).optional(),
-  baseUrl: z.string().max(2000).optional(),
-  model: z.string().max(500).optional(),
-  apiKey: z.string().max(20000).optional(),
-  toolSupport: z.enum(['auto', 'enabled', 'disabled']).optional(),
-});
 export const jsonSchemas = {
   workspace: z.toJSONSchema(workspaceSchema, { target: 'draft-7' }),
   operation: z.toJSONSchema(operationSchema, { target: 'draft-7' }),

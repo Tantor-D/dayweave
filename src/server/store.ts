@@ -1,14 +1,9 @@
 import { defaultStatistics } from '../domain/statistics.ts';
 import { legacyPreferencesSchema } from '../domain/legacy.ts';
 import { createHash, randomUUID } from 'node:crypto';
-import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { chmod, lstat, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { dirname, join, resolve, sep } from 'node:path';
-import {
-  preferencesSchema,
-  previewSchema,
-  settingsPatchSchema,
-  targetSchema,
-} from '../domain/schema.ts';
+import { preferencesSchema, previewSchema, targetSchema } from '../domain/schema.ts';
 import {
   applyOperations,
   completionChanges,
@@ -26,7 +21,6 @@ import type {
   Snapshot,
   Source,
   Target,
-  UserSettings,
   Workspace,
 } from '../domain/types.ts';
 
@@ -38,13 +32,6 @@ interface StoreOptions {
   localDir: string;
   failpoint?: (point: Failpoint) => void | Promise<void>;
   now?: () => Date;
-}
-interface ModelConfig {
-  approvalMode: UserSettings['approvalMode'];
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-  toolSupport: UserSettings['toolSupport'];
 }
 const defaults: Preferences = {
   statistics: structuredClone(defaultStatistics),
@@ -59,13 +46,6 @@ const defaults: Preferences = {
   dayStart: 0,
   dayEnd: 1440,
   inheritParentTags: true,
-};
-const modelDefaults: ModelConfig = {
-  approvalMode: 'require_confirmation',
-  baseUrl: 'https://api.openai.com/v1',
-  model: '',
-  apiKey: '',
-  toolSupport: 'auto',
 };
 export const hashContent = (content: string | null): string | null =>
   content === null ? null : createHash('sha256').update(content, 'utf8').digest('hex');
@@ -405,6 +385,16 @@ export class Store {
   }
   private async readNow(target: Target): Promise<Snapshot> {
     const path = this.targetPath(target);
+    if (target.startsWith('daily/') || target.startsWith('notes/')) {
+      for (const entry of [join(this.dataDir, 'reflections'), dirname(path), path]) {
+        try {
+          if ((await lstat(entry)).isSymbolicLink())
+            coded('VALIDATION_ERROR', '反思路径不能使用符号链接');
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+      }
+    }
     const disk = await textFile(path);
     if (!this.known.has(target)) {
       this.validateContent(target, disk);
@@ -513,7 +503,8 @@ export class Store {
       const proposal = p!;
       if (this.requestMap[requestId] && this.requestMap[requestId] !== id)
         coded('CONFLICT', 'requestId 已用于另一条提案', 409);
-      if (confirm && source !== 'user') coded('FORBIDDEN', '只有网页用户可以确认 AI 提案', 403);
+      if (confirm && source !== 'user' && !(source === 'harness' && proposal.source === 'harness'))
+        coded('FORBIDDEN', 'CLI 只能确认 harness 来源的提案', 403);
       if (source !== 'user' && source !== proposal.source)
         coded('FORBIDDEN', '不能提交其他来源的提案', 403);
       this.requestMap[requestId] = id;
@@ -528,12 +519,7 @@ export class Store {
         const current = await this.readNow(proposal.target);
         this.assertWritable(current);
         this.assertBase(current, proposal.baseHash, proposal.baseRevision);
-        const settings = await this.getModelConfig();
-        if (
-          proposal.source !== 'user' &&
-          !confirm &&
-          settings.approvalMode === 'require_confirmation'
-        ) {
+        if (proposal.source !== 'user' && !confirm) {
           proposal.status = 'pending_confirmation';
           delete proposal.error;
           await this.saveProposal(proposal);
@@ -558,7 +544,11 @@ export class Store {
         )
           coded('CONFLICT', '提案版本不合法', 409);
         const approval =
-          proposal.source === 'user' ? 'manual' : confirm ? 'web_confirmation' : 'auto_accept';
+          proposal.source === 'user'
+            ? 'manual'
+            : source === 'harness'
+              ? 'cli_confirmation'
+              : 'web_confirmation';
         const committedAt = this.now();
         // IDs and user-controlled content stay frozen. System timestamps describe execution, not preview.
         if (proposal.target === 'workspace' && !proposal.restoreOf) {
@@ -833,48 +823,6 @@ export class Store {
       await atomicWrite(join(this.dataDir, 'preferences.json'), serialize(preferences));
       this.notify();
       return preferences;
-    });
-  }
-  async getModelConfig(): Promise<ModelConfig> {
-    const raw = await textFile(join(this.localDir, 'secrets.json'));
-    if (!raw) return { ...modelDefaults };
-    try {
-      const value = settingsPatchSchema.parse(JSON.parse(raw));
-      return { ...modelDefaults, ...value };
-    } catch {
-      return coded('INVALID_SETTINGS', '本机设置损坏；未覆盖 secrets.json', 409);
-    }
-  }
-  async getSettings(): Promise<UserSettings> {
-    const { apiKey, ...settings } = await this.getModelConfig();
-    return { ...settings, hasApiKey: Boolean(apiKey) };
-  }
-  async updateSettings(
-    patch: Partial<Omit<UserSettings, 'hasApiKey'>> & { apiKey?: string },
-  ): Promise<UserSettings> {
-    return this.exclusive(async () => {
-      const parsed = settingsPatchSchema.safeParse(patch);
-      if (!parsed.success) coded('VALIDATION_ERROR', parsed.error.message);
-      const value = { ...(await this.getModelConfig()), ...parsed.data };
-      if (value.baseUrl) {
-        let url: URL;
-        try {
-          url = new URL(value.baseUrl);
-        } catch {
-          coded('VALIDATION_ERROR', '接口基础地址无效');
-        }
-        if (
-          !['http:', 'https:'].includes(url!.protocol) ||
-          url!.username ||
-          url!.password ||
-          url!.search ||
-          url!.hash
-        )
-          coded('VALIDATION_ERROR', '接口地址必须是没有凭据、查询和片段的 HTTP(S) 地址');
-      }
-      await atomicWrite(join(this.localDir, 'secrets.json'), serialize(value));
-      this.notify();
-      return this.getSettings();
     });
   }
   async listDocuments(): Promise<{ target: Target; title: string }[]> {

@@ -56,7 +56,7 @@ test('HTTP protects local origins, credentials and user-only settings', async (t
         payload: { approvalMode: 'auto_accept' },
       })
     ).statusCode,
-    403,
+    404,
   );
   assert.equal(
     (
@@ -79,8 +79,7 @@ test('HTTP protects local origins, credentials and user-only settings', async (t
       model: 'mock',
     },
   });
-  assert.equal(settings.statusCode, 200, settings.body);
-  assert.equal(settings.json().hasApiKey, true);
+  assert.equal(settings.statusCode, 404, settings.body);
   assert.ok(!settings.body.includes('test-key-not-returned'));
   const malicious = await app.inject({
     method: 'POST',
@@ -95,8 +94,8 @@ test('HTTP protects local origins, credentials and user-only settings', async (t
   );
 });
 
-test('web manual edits, AI confirmation, policy changes and stale proposals share one workspace', async (t) => {
-  const { app, headers, harness } = await fixture(t);
+test('web manual edits, AI confirmation, CLI confirmation and stale proposals share one workspace', async (t) => {
+  const { app, root, headers, harness } = await fixture(t);
   const read = async () => (await app.inject({ url: '/api/workspace', headers })).json();
   const preview = async (auth: typeof headers | typeof harness, title: string) => {
     const snap = await read();
@@ -152,26 +151,31 @@ test('web manual edits, AI confirmation, policy changes and stale proposals shar
     ['工具任务', '手工任务'],
   );
   const automatic = await preview(harness, '自动任务');
-  await app.inject({
-    method: 'PATCH',
-    url: '/api/settings',
-    headers,
-    payload: { approvalMode: 'auto_accept' },
-  });
+  await writeFile(
+    join(root, 'local/secrets.json'),
+    JSON.stringify({ approvalMode: 'auto_accept' }),
+  );
   const result = await app.inject({
     method: 'POST',
     url: `/api/proposals/${automatic.id}/submit`,
     headers: harness,
     payload: { requestId: 'auto-request' },
   });
-  assert.equal(result.json().status, 'applied', result.body);
+  assert.equal(result.json().status, 'pending_confirmation', result.body);
+  const confirmation = await app.inject({
+    method: 'POST',
+    url: `/api/proposals/${automatic.id}/confirm`,
+    headers: harness,
+    payload: { requestId: 'cli-confirm' },
+  });
+  assert.equal(confirmation.json().status, 'applied', confirmation.body);
   const repeat = await app.inject({
     method: 'POST',
     url: `/api/proposals/${automatic.id}/submit`,
     headers: harness,
     payload: { requestId: 'auto-request' },
   });
-  assert.equal(repeat.json().changeId, result.json().changeId);
+  assert.equal(repeat.json().changeId, confirmation.json().changeId);
   const history = await app.inject({ url: '/api/history', headers });
   assert.equal(
     history.json().filter((c: { status: string }) => c.status === 'committed').length,
@@ -282,6 +286,31 @@ test('harness CLI uses the running service, parses stdin and returns a pending p
   assert.equal(submit.code, 0, submit.stderr);
   assert.equal(JSON.parse(submit.stdout).status, 'pending_confirmation');
   assert.equal(((await store.read('workspace')).data as { tasks: unknown[] }).tasks.length, 0);
+  const detail = await cli(['proposal', proposal.id]);
+  assert.equal(JSON.parse(detail.stdout).before, proposal.before);
+  assert.ok(
+    JSON.parse((await cli(['proposals'])).stdout).some((p: { id: string }) => p.id === proposal.id),
+  );
+  const confirmed = await cli(['confirm', proposal.id, '--request-id', 'chat-confirmed']);
+  assert.equal(confirmed.code, 0, confirmed.stdout);
+  assert.equal(JSON.parse(confirmed.stdout).status, 'applied');
+  const repeated = await cli(['confirm', proposal.id, '--request-id', 'chat-confirmed']);
+  assert.equal(JSON.parse(repeated.stdout).changeId, JSON.parse(confirmed.stdout).changeId);
+  const note = await cli(['preview'], {
+    target: 'daily/2026-11-04',
+    baseHash: null,
+    operations: [{ type: 'text.write', content: '# 今日\n睡眠很好' }],
+  });
+  await cli(['confirm', JSON.parse(note.stdout).id, '--request-id', 'note-confirmed']);
+  assert.equal(JSON.parse((await cli(['documents'])).stdout).total, 1);
+  assert.equal(
+    JSON.parse((await cli(['search'], { query: '睡眠' })).stdout).items[0].target,
+    'daily/2026-11-04',
+  );
+  assert.equal(
+    JSON.parse((await cli(['read', 'daily/2026-11-04'])).stdout).data,
+    '# 今日\n睡眠很好',
+  );
 });
 
 test('auth rejects malformed tokens and cookie-only writes; harness cannot use browser-only actions', async (t) => {
@@ -300,13 +329,7 @@ test('auth rejects malformed tokens and cookie-only writes; harness cannot use b
     payload: { approvalMode: 'auto_accept' },
   });
   assert.equal(cookieWrite.statusCode, 401, cookieWrite.body);
-  for (const url of [
-    '/api/proposals/anything/confirm',
-    '/api/proposals/anything/reject',
-    '/api/external',
-    '/api/chat',
-    '/api/chat/cancel',
-  ]) {
+  for (const url of ['/api/proposals/anything/reject', '/api/external']) {
     const result = await app.inject({
       method: 'POST',
       url,
