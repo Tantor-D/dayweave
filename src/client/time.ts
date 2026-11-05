@@ -70,23 +70,26 @@ export function segmentsFor(tasks: Task[], date: string, dayStart = 0, dayEnd = 
   result.sort(
     (a, b) => a.start - b.start || b.end - a.end || a.placement.id.localeCompare(b.placement.id),
   );
-  let group: Segment[] = [],
-    ends: number[] = [],
-    groupEnd = -1;
+  let group: Segment[] = [];
+  let groupEnd = -1;
   const finish = () => {
-    for (const segment of group) segment.lanes = ends.length;
+    group.sort((a, b) => a.task.order - b.task.order || a.task.id.localeCompare(b.task.id));
+    let lanes = 0;
+    for (const [index, segment] of group.entries()) {
+      // Place the whole bar after every earlier-ranked bar that overlaps it.
+      for (let i = 0; i < index; i++) {
+        const earlier = group[i];
+        if (earlier.start < segment.end && segment.start < earlier.end) {
+          segment.lane = Math.max(segment.lane, earlier.lane + 1);
+        }
+      }
+      lanes = Math.max(lanes, segment.lane + 1);
+    }
+    for (const segment of group) segment.lanes = lanes;
     group = [];
-    ends = [];
   };
   for (const segment of result) {
-    if (segment.start >= groupEnd) {
-      finish();
-      groupEnd = -1;
-    }
-    let lane = ends.findIndex((end) => end <= segment.start);
-    if (lane < 0) lane = ends.length;
-    ends[lane] = segment.end;
-    segment.lane = lane;
+    if (segment.start >= groupEnd) finish();
     group.push(segment);
     groupEnd = Math.max(groupEnd, segment.end);
   }

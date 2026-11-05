@@ -105,3 +105,29 @@ test('an event ending exactly at midnight is excluded from the following day', (
   assert.equal(segmentsFor([ending], addDays(date, 1)).length, 0);
   assert.equal(taskOnDay(ending, addDays(date, 1)), false);
 });
+
+test('repeated tasks keep their relative lanes and a long placement stays one bar', () => {
+  const long = { ...task('a', 840, 1080), order: 2 };
+  const first = { ...task('z', 855, 960), order: 0 };
+  const middle = { ...task('m', 855, 900), order: 1 };
+  long.placements.unshift(...task('evening-a', 1140, 1230).placements);
+  first.placements.push(...task('evening-z', 1140, 1230).placements);
+
+  for (const tasks of [
+    [long, middle, first],
+    [first, middle, long],
+  ]) {
+    const segments = segmentsFor(tasks, date);
+    const bars = (id: string) =>
+      segments.filter((s) => s.task.id === id).map((s) => [s.start, s.end, s.lane, s.lanes]);
+    assert.deepEqual(bars('a'), [
+      [840, 1080, 2, 3],
+      [1140, 1230, 1, 2],
+    ]);
+    assert.deepEqual(bars('z'), [
+      [855, 960, 0, 3],
+      [1140, 1230, 0, 2],
+    ]);
+    assert.deepEqual(bars('m'), [[855, 900, 1, 3]]);
+  }
+});
