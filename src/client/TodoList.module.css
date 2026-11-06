@@ -258,12 +258,17 @@
   background: var(--liquid-material);
   border-color: var(--glass-edge);
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(var(--material-blur)) saturate(155%);
-  backdrop-filter: blur(var(--material-blur)) saturate(155%);
+  -webkit-backdrop-filter: blur(var(--material-blur)) saturate(100%);
+  backdrop-filter: blur(var(--material-blur)) saturate(100%);
 }
 :global([data-theme='liquid-glass-light']) .presets {
   padding: 4px;
   border-radius: 999px;
-  background: #ffffff70;
+  background: #ffffff28;
   border: 1px solid var(--glass-edge);
+}
+:global([data-theme='liquid-glass-light'][data-wallpaper='true']) :is(.heading, .toolbar) {
+  background: #ffffffc4;
+  border-radius: 22px;
+  padding: 16px;
 }

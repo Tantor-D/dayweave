@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { defaultLiquidGlass, type LiquidGlassSettings } from '../../../domain/liquid-glass';
+import { LiquidGlassDrawer } from '../liquid-glass/LiquidGlassDrawer';
 import { TodoList } from '../../TodoList';
 import { usePanelResize } from './usePanelResize';
 import { StatisticsDashboard } from '../../StatisticsDashboard';
@@ -101,6 +104,9 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
     pending,
     loadExample,
   } = workbench;
+  const [liquidDraft, setLiquidDraft] = useState<LiquidGlassSettings | null>(null);
+  const liquid = preferences.theme === 'liquid-glass-light';
+  const liquidSettings = liquidDraft ?? preferences.liquidGlass ?? defaultLiquidGlass;
   const { panelWidth, resize } = usePanelResize(preferences.panelWidth, updatePreferences);
   const taskRow = (task: Task) => (
     <div
@@ -158,7 +164,23 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
   return (
     <ThemeContext.Provider value={preferences.theme}>
       <InheritTagsContext.Provider value={preferences.inheritParentTags}>
-        <div className={s.app} style={themeStyle(preferences.theme)} data-theme={preferences.theme}>
+        <div
+          className={s.app}
+          style={themeStyle(preferences.theme)}
+          data-theme={preferences.theme}
+          data-wallpaper={liquid && !!liquidSettings.backgroundImage ? 'true' : undefined}
+        >
+          {liquid && liquidSettings.backgroundImage && (
+            <div
+              className={s.wallpaper}
+              aria-hidden="true"
+              style={{
+                backgroundImage: `url("${liquidSettings.backgroundImage}")`,
+                filter: `blur(${liquidSettings.backgroundBlur}px)`,
+                inset: -liquidSettings.backgroundBlur * 3,
+              }}
+            />
+          )}
           <header
             className={`${s.header} ${view === 'statistics' ? statisticsStyles.statisticsHeader : ''}`}
           >
@@ -238,7 +260,14 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               >
                 <History size={17} />
               </button>
-              <ThemePicker workbench={workbench} />
+              <ThemePicker workbench={workbench} extraLocked={liquidDraft !== null} />
+              {liquid && (
+                <LiquidGlassDrawer
+                  workbench={workbench}
+                  draft={liquidDraft}
+                  onDraft={setLiquidDraft}
+                />
+              )}
               <button
                 aria-label="设置"
                 title="设置"

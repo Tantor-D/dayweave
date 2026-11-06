@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { defaultLiquidGlass } from '../src/domain/liquid-glass';
 import assert from 'node:assert/strict';
 import { readPreferences, savePreferences } from '../src/client/preferences.ts';
 import { defaultStatistics, statisticsRange } from '../src/domain/statistics.ts';
@@ -34,6 +35,7 @@ test('legacy running backend responses retain statistics defaults on initial loa
   });
   const loaded = await readPreferences();
   assert.deepEqual(loaded.statistics, defaultStatistics);
+  assert.deepEqual(loaded.liquidGlass, defaultLiquidGlass);
   assert.equal(loaded.showUntimed, false);
   assert.equal((await savePreferences({ showUntimed: true })).showUntimed, true);
   assert.doesNotThrow(() =>

@@ -1,3 +1,4 @@
+import { isBackgroundImage } from './liquid-glass';
 import { isLightSurface } from './neumorphism.ts';
 import { validStatisticsDate } from './statistics.ts';
 import { z } from 'zod';
@@ -137,9 +138,17 @@ export const neumorphismSchema = z.strictObject({
   blur: z.number().int().min(6).max(36),
   light: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']),
 });
+export const liquidGlassSchema = z.strictObject({
+  backgroundImage: z
+    .string()
+    .refine(isBackgroundImage, '背景须为有效大小的本地 JPEG 图片')
+    .nullable(),
+  backgroundBlur: z.number().int().min(0).max(40),
+});
 export const preferencesSchema = z.strictObject({
   statistics: statisticsPreferencesSchema,
   neumorphism: neumorphismSchema.optional(),
+  liquidGlass: liquidGlassSchema.optional(),
   theme: z.enum([
     'glass-light',
     'glass-dark',

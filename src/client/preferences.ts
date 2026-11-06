@@ -1,3 +1,4 @@
+import { defaultLiquidGlass } from '../domain/liquid-glass';
 import { defaultNeumorphism } from '../domain/neumorphism';
 import { api } from './api.ts';
 import { defaultStatistics } from '../domain/statistics.ts';
@@ -7,6 +8,7 @@ import type { Preferences } from '../domain/types.ts';
 function normalizePreferences(value: Preferences): Preferences {
   return {
     ...value,
+    liquidGlass: value.liquidGlass ?? { ...defaultLiquidGlass },
     showUntimed: value.showUntimed ?? false,
     neumorphism: value.neumorphism ?? { ...defaultNeumorphism },
     autoCompleteParents: value.autoCompleteParents ?? true,

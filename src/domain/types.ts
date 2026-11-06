@@ -1,3 +1,4 @@
+import type { LiquidGlassSettings } from './liquid-glass';
 import type { NeumorphismSettings } from './neumorphism';
 export type Source = 'user' | 'web_ai' | 'harness' | 'external';
 export type Target =
@@ -122,6 +123,7 @@ export interface StatisticsPreferences {
   hiddenCharts: ('trend' | 'duration' | 'first' | 'parallel' | 'tags' | 'selectedTag')[];
 }
 export interface Preferences {
+  liquidGlass?: LiquidGlassSettings;
   neumorphism?: NeumorphismSettings;
   statistics: StatisticsPreferences;
   theme:

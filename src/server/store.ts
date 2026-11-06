@@ -1,3 +1,4 @@
+import { defaultLiquidGlass } from '../domain/liquid-glass';
 import { defaultNeumorphism } from '../domain/neumorphism.ts';
 import { defaultStatistics } from '../domain/statistics.ts';
 import { legacyPreferencesSchema } from '../domain/legacy.ts';
@@ -36,6 +37,7 @@ interface StoreOptions {
 }
 const defaults: Preferences = {
   statistics: structuredClone(defaultStatistics),
+  liquidGlass: { ...defaultLiquidGlass },
   neumorphism: { ...defaultNeumorphism },
   theme: 'neumorphism-light',
   days: 1,
@@ -877,6 +879,7 @@ function parsePreferences(value: Record<string, unknown>): Preferences {
     coded('INVALID_PREFERENCES', '状态筛选无效');
   const p = preferencesSchema.parse({
     statistics: structuredClone(defaultStatistics),
+    liquidGlass: { ...defaultLiquidGlass },
     neumorphism: { ...defaultNeumorphism },
     dayStart: 0,
     dayEnd: 1440,

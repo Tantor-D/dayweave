@@ -1,3 +1,4 @@
+import { defaultLiquidGlass } from '../../domain/liquid-glass';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   Operation,
@@ -16,6 +17,7 @@ import { api, commit, readWorkspace } from '../api';
 import { useScheduleDrag } from '../scheduleDrag';
 import { atMinute, datesFrom, today, matchesSidebarDate, type TaskDateFilter } from '../time';
 const initialPreferences: Preferences = {
+  liquidGlass: { ...defaultLiquidGlass },
   neumorphism: { ...defaultNeumorphism },
   statistics: structuredClone(defaultStatistics),
   theme: 'neumorphism-light',
