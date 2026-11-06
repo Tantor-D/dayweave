@@ -31,6 +31,7 @@ const presentations = {
 };
 const familyByTheme: Record<ThemeDefinition['id'], keyof typeof presentations> = {
   'glass-light': 'glass',
+  'liquid-glass-light': 'glass',
   'glass-dark': 'glass',
   'neobrutalism-light': 'neobrutalism',
   'claymorphism-light': 'claymorphism',

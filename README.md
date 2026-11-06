@@ -154,3 +154,5 @@ v0.9.0 / neumorphism-theme：[功能计划](docs/plans/v0.9.0_neumorphism-theme_
 选择「柔光拟态 Neumorphism」后，点击主题选择器旁的「拟态设置」，在右侧抽屉调整底色、强调色、圆角、凸起距离、阴影强度、柔和度和光源方向。修改实时预览，点击保存后刷新仍保留；取消、关闭或 Escape 恢复打开前外观。「恢复默认」先预览，保存后生效。窄窗口下抽屉全宽显示，编辑任务或保存期间不可打开。
 
 新风格独立位于 `src/client/presentations/neumorphism`，配置沿用偏好文件保存，不改变任务数据。底色限定浅色，各 RGB 通道至少为 180；其他参数具有范围限制。
+
+v0.10.0 / liquid-glass-theme：[功能计划](docs/plans/v0.10.0_liquid-glass-theme_functional-plan.md) · [技术方案](docs/plans/v0.10.0_liquid-glass-theme_technical-plan.md)。在「界面风格」中选择「液态玻璃 Liquid Glass」，即可启用浅色透光面板、边缘高光与胶囊控件；选择会保存并在刷新后恢复。保留现有默认主题。

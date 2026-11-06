@@ -28,7 +28,7 @@ process.on('SIGINT', close);
 process.on('SIGTERM', close);
 try {
   await instance.app.listen({ port, host: '127.0.0.1' });
-  console.log(`个人专注工作台 v0.9.0 · http://127.0.0.1:${port}`);
+  console.log(`个人专注工作台 v0.10.0 · http://127.0.0.1:${port}`);
   console.log(`数据目录：${resolve(values['data-dir']!)}`);
 } catch (error) {
   console.error(

@@ -1,3 +1,4 @@
+import { definitions as liquidGlass } from './presentations/liquid-glass/themes';
 import { definitions as neumorphism } from './presentations/neumorphism/themes';
 import { definitions as claymorphism } from './presentations/claymorphism/themes';
 import { definitions as glass } from './presentations/glass/themes';
@@ -20,7 +21,8 @@ export interface ThemeDefinition {
     | 'glass-dark'
     | 'neobrutalism-light'
     | 'claymorphism-light'
-    | 'neumorphism-light';
+    | 'neumorphism-light'
+    | 'liquid-glass-light';
   mode: 'light' | 'dark';
   label: string;
   tokens: Record<string, string>;
@@ -41,6 +43,7 @@ export function ThemeCard(props: CardAppearanceProps) {
 }
 export const themes: Record<ThemeDefinition['id'], ThemeDefinition> = {
   ...glass,
+  ...liquidGlass,
   ...neobrutalism,
   ...claymorphism,
   ...neumorphism,

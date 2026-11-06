@@ -252,3 +252,18 @@
 :global([data-theme='neumorphism-light']) .rootTarget {
   border-radius: var(--radius);
 }
+
+:global([data-theme='liquid-glass-light']) .group {
+  border-radius: 22px;
+  background: var(--liquid-material);
+  border-color: var(--glass-edge);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(var(--material-blur)) saturate(155%);
+  backdrop-filter: blur(var(--material-blur)) saturate(155%);
+}
+:global([data-theme='liquid-glass-light']) .presets {
+  padding: 4px;
+  border-radius: 999px;
+  background: #ffffff70;
+  border: 1px solid var(--glass-edge);
+}

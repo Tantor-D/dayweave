@@ -2006,3 +2006,125 @@
 .app .search button {
   flex-shrink: 0;
 }
+
+/* Liquid Glass shares the glass layout; all material overrides stay theme-scoped. */
+.app[data-theme='liquid-glass-light'] {
+  background:
+    radial-gradient(ellipse at 5% 12%, #b2cbff 0, transparent 48%),
+    radial-gradient(ellipse at 88% 4%, #efd0e7 0, transparent 46%),
+    radial-gradient(ellipse at 80% 100%, #9ddbd9 0, transparent 53%),
+    linear-gradient(135deg, #e7eafa, #e6f2f7 52%, #d0e6ee);
+}
+.app[data-theme='liquid-glass-light']
+  :is(.sidebar, .board, .detail, .headerActions, .modal, .scheduleDialog, .toast) {
+  background: var(--liquid-material);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(var(--material-blur)) saturate(155%);
+  backdrop-filter: blur(var(--material-blur)) saturate(155%);
+}
+.app[data-theme='liquid-glass-light'] .headerActions {
+  border-radius: 999px;
+  padding: 6px;
+}
+.app[data-theme='liquid-glass-light'] button {
+  border-radius: 999px;
+  transition:
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+.app[data-theme='liquid-glass-light'] button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.app[data-theme='liquid-glass-light'] :is(.headerActions button.active, .segmented button.active) {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--accent);
+  box-shadow:
+    0 3px 10px #264b7c15,
+    inset 0 1px 0 #fff;
+}
+.app[data-theme='liquid-glass-light'] :is(.segmented, .dateNavigation) {
+  border-radius: 999px;
+  background: #6b92c012;
+  border: 1px solid #ffffff70;
+  padding: 4px;
+}
+.app[data-theme='liquid-glass-light'] .search {
+  border-radius: 16px;
+  background: #ffffff66;
+  border-color: #ffffffa6;
+  box-shadow: inset 0 1px 3px #456b9610;
+}
+.app[data-theme='liquid-glass-light'] :is(input, select, textarea) {
+  border-radius: 12px;
+}
+.app[data-theme='liquid-glass-light'] .headerActions select {
+  border-radius: 999px;
+  max-width: 180px;
+  font-size: 12px;
+}
+.app[data-theme='liquid-glass-light'] .taskRow {
+  border-radius: 14px;
+}
+.app[data-theme='liquid-glass-light'] .selectedTask {
+  background: #ffffffb8;
+  box-shadow:
+    inset 0 0 0 1px #fff,
+    0 3px 10px #254c7b0d;
+}
+.app[data-theme='liquid-glass-light'] :is(.modal, .scheduleDialog) {
+  border-radius: 28px;
+  background: linear-gradient(135deg, #ffffffed, #edf5fbe8);
+}
+.app[data-theme='liquid-glass-light'] .primary {
+  background: linear-gradient(155deg, #337eeb, #1455bd);
+  color: #fff;
+  border-color: #ffffff60;
+  box-shadow:
+    inset 0 1px 0 #ffffff55,
+    0 4px 12px #175ac425;
+}
+@media (max-width: 700px) {
+  .app[data-theme='liquid-glass-light'] .header {
+    height: auto;
+    min-height: 74px;
+    flex-wrap: wrap;
+    padding: 12px 0;
+  }
+  .app[data-theme='liquid-glass-light'] .headerActions {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .app[data-theme='liquid-glass-light'] .headerActions > * {
+    flex-shrink: 0;
+  }
+  .app[data-theme='liquid-glass-light'] .detail {
+    top: 132px;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .app[data-theme='liquid-glass-light'] {
+    --liquid-material: var(--solid) !important;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .app[data-theme='liquid-glass-light'] {
+    --liquid-material: var(--solid) !important;
+    --surface: var(--solid) !important;
+    --input: var(--solid) !important;
+    --material-blur: 0px !important;
+  }
+  .app[data-theme='liquid-glass-light'] :is(.modal, .scheduleDialog) {
+    background: var(--solid);
+  }
+  .app[data-theme='liquid-glass-light'] .modalBackdrop,
+  .app[data-theme='liquid-glass-light'] .scheduleDialog::backdrop {
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app[data-theme='liquid-glass-light'] button:active:not(:disabled) {
+    transform: none;
+  }
+}

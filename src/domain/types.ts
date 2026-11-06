@@ -124,7 +124,13 @@ export interface StatisticsPreferences {
 export interface Preferences {
   neumorphism?: NeumorphismSettings;
   statistics: StatisticsPreferences;
-  theme: 'glass-light' | 'glass-dark' | 'neobrutalism-light' | 'claymorphism-light' | 'neumorphism-light';
+  theme:
+    | 'glass-light'
+    | 'glass-dark'
+    | 'neobrutalism-light'
+    | 'claymorphism-light'
+    | 'neumorphism-light'
+    | 'liquid-glass-light';
   days: 1 | 3 | 7;
   orientation: 'vertical' | 'horizontal';
   showUntimed: boolean;

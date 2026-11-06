@@ -140,7 +140,14 @@ export const neumorphismSchema = z.strictObject({
 export const preferencesSchema = z.strictObject({
   statistics: statisticsPreferencesSchema,
   neumorphism: neumorphismSchema.optional(),
-  theme: z.enum(['glass-light', 'glass-dark', 'neobrutalism-light', 'claymorphism-light', 'neumorphism-light']),
+  theme: z.enum([
+    'glass-light',
+    'glass-dark',
+    'neobrutalism-light',
+    'claymorphism-light',
+    'neumorphism-light',
+    'liquid-glass-light',
+  ]),
   days: z.union([z.literal(1), z.literal(3), z.literal(7)]),
   orientation: z.enum(['vertical', 'horizontal']),
   showUntimed: z.boolean(),
