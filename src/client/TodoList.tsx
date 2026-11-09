@@ -29,13 +29,27 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
   const [editing, setEditing] = useState<Selection>(),
     [title, setTitle] = useState('');
   const [dragging, setDragging] = useState<Selection>();
+  const [dateEditing, setDateEditing] = useState<Selection>();
+  const dateEditor = useRef<{
+    input: HTMLInputElement;
+    finish: (commit: boolean) => void;
+  } | undefined>(undefined);
   const dragRef = useRef<Selection | undefined>(undefined);
   const [hover, setHover] = useState('');
   const locked = w.busy || !!w.snapshot?.readOnly || !!w.snapshot?.external;
   useEffect(() => {
-    w.setTodoEditing(!!editing || !!dragging);
+    w.setTodoEditing(!!editing || !!dragging || !!dateEditing);
     return () => w.setTodoEditing(false);
-  }, [editing, dragging, w.setTodoEditing]);
+  }, [editing, dragging, dateEditing, w.setTodoEditing]);
+  useEffect(() => {
+    const finishOutside = (event: PointerEvent) => {
+      const editor = dateEditor.current;
+      if (editor && event.target instanceof Node && !editor.input.contains(event.target))
+        editor.finish(true);
+    };
+    document.addEventListener('pointerdown', finishOutside, true);
+    return () => document.removeEventListener('pointerdown', finishOutside, true);
+  }, []);
   const cancelDrag = () => {
     dragRef.current = undefined;
     setDragging(undefined);
@@ -232,9 +246,38 @@ export function TodoList({ workbench: w }: { workbench: Workbench }) {
             className={s.date}
             type="date"
             aria-label={`分配日期 ${task.title}`}
-            value={row.date ?? ''}
+            defaultValue={row.date ?? ''}
             disabled={locked || !!editing}
-            onChange={(e) => void moveDate(selection(row, key, groupKey), e.target.value)}
+            onFocus={(e) => {
+              const input = e.currentTarget;
+              if (dateEditor.current?.input === input) return;
+              dateEditor.current?.finish(false);
+              const item = selection(row, key, groupKey);
+              setDateEditing(item);
+              dateEditor.current = {
+                input,
+                finish: (commit) => {
+                  const date = input.value;
+                  const valid = input.validity.valid;
+                  dateEditor.current = undefined;
+                  input.value = row.date ?? '';
+                  setDateEditing(undefined);
+                  if (commit && date && valid && !input.disabled && input.isConnected)
+                    void moveDate(item, date);
+                },
+              };
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                dateEditor.current?.finish(false);
+                e.currentTarget.blur();
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                dateEditor.current?.finish(true);
+                e.currentTarget.blur();
+              }
+            }}
           />
         )}
       </div>

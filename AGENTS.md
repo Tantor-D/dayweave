@@ -115,5 +115,7 @@ Run Context7 CLI requests outside Codex's default sandbox. If a Context7 CLI com
 
 ### 完成汇报
 
+修复前端问题时，同步更新实际运行服务使用的前端构建，并确认用户打开的页面已加载修复后的代码；不能只验证源码或隔离测试页面。需要刷新页面时明确告知用户。
+
 简述改动、正式文档位置（如有）、验证结果、未解决问题及本地提交和实际推送状态；正式迭代注明版本号和任务名称，小修改无需补造版本或计划，按实际情况说明是否留待开发者提交。存在 `ROADMAP.md` 时说明 `PROGRESS.md` 是否已更新。验收结果留在会话或已忽略目录，不另建进入 Git 的验收记录。
 <!-- personal-dev-workflow:end -->
