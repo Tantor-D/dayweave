@@ -90,6 +90,9 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
     refresh,
     save,
     updatePreferences,
+    weekView,
+    showCurrentWeek,
+    showDaysFromToday,
     drag,
     start,
     canClick,
@@ -460,12 +463,20 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                         {([1, 3, 7] as const).map((days) => (
                           <button
                             key={days}
-                            className={preferences.days === days ? s.active : ''}
-                            onClick={() => void updatePreferences({ days })}
+                            className={!weekView && preferences.days === days ? s.active : ''}
+                            aria-pressed={!weekView && preferences.days === days}
+                            onClick={() => void showDaysFromToday(days)}
                           >
                             {days === 1 ? '单日' : `${days} 日`}
                           </button>
                         ))}
+                        <button
+                          className={weekView ? s.active : ''}
+                          aria-pressed={weekView}
+                          onClick={() => void showCurrentWeek()}
+                        >
+                          本周
+                        </button>
                       </div>
                       <div className={s.viewActions}>
                         <button

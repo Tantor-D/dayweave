@@ -15,7 +15,7 @@ import type { TagConfirmation } from '../TagPropagationDialog';
 import { readPreferences, savePreferences } from '../preferences';
 import { api, commit, readWorkspace } from '../api';
 import { useScheduleDrag } from '../scheduleDrag';
-import { atMinute, datesFrom, today, matchesSidebarDate, type TaskDateFilter } from '../time';
+import { atMinute, datesFrom, filterDates, today, matchesSidebarDate, type TaskDateFilter } from '../time';
 const initialPreferences: Preferences = {
   liquidGlass: { ...defaultLiquidGlass },
   neumorphism: { ...defaultNeumorphism },
@@ -44,6 +44,7 @@ type Panel =
   | 'organization'
   | 'proposals';
 export function useWorkbench() {
+  const [weekView, setWeekView] = useState(false);
   const [todoEditing, setTodoEditing] = useState(false);
   const [statisticsEditing, setStatisticsEditing] = useState(false);
   const [view, setView] = useState<'workbench' | 'statistics' | 'todo'>('workbench');
@@ -202,6 +203,18 @@ export function useWorkbench() {
       return false;
     }
   };
+  const showDaysFromToday = async (days: Preferences['days']) => {
+    if (await updatePreferences({ days })) {
+      setDate(today());
+      setWeekView(false);
+    }
+  };
+  const showCurrentWeek = async () => {
+    if (await updatePreferences({ days: 7 })) {
+      setDate(filterDates('week')[0]);
+      setWeekView(true);
+    }
+  };
   const { drag, start, canClick } = useScheduleDrag(
     (ops, summary) => save(ops, summary, snapshot),
     snapshot?.data.tasks ?? [],
@@ -298,7 +311,11 @@ export function useWorkbench() {
     preferences,
     proposals,
     date,
-    setDate,
+    weekView,
+    setDate: (value: string) => {
+      setDate(value);
+      setWeekView(false);
+    },
     panel,
     setPanel,
     selected,
@@ -321,6 +338,8 @@ export function useWorkbench() {
     refresh,
     save,
     updatePreferences,
+    showCurrentWeek,
+    showDaysFromToday,
     drag,
     start,
     canClick,
