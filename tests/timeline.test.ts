@@ -106,6 +106,16 @@ test('an event ending exactly at midnight is excluded from the following day', (
   assert.equal(taskOnDay(ending, addDays(date, 1)), false);
 });
 
+test('chain overlaps reuse two lanes when the first bar ends before the third starts', () => {
+  const tasks = [task('a', 915, 975), task('b', 960, 1050), task('c', 1020, 1050)];
+  for (const input of [tasks, [...tasks].reverse()]) {
+    const result = segmentsFor(input, date);
+    assert.ok(result.every((s) => s.lanes === 2), 'chain overlap must use only two lanes');
+    assert.equal(result[0].lane, result[2].lane);
+    assert.notEqual(result[0].lane, result[1].lane);
+  }
+});
+
 test('repeated tasks keep their relative lanes and a long placement stays one bar', () => {
   const long = { ...task('a', 840, 1080), order: 2 };
   const first = { ...task('z', 855, 960), order: 0 };

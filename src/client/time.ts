@@ -73,19 +73,24 @@ export function segmentsFor(tasks: Task[], date: string, dayStart = 0, dayEnd = 
   let group: Segment[] = [];
   let groupEnd = -1;
   const finish = () => {
-    group.sort((a, b) => a.task.order - b.task.order || a.task.id.localeCompare(b.task.id));
-    let lanes = 0;
-    for (const [index, segment] of group.entries()) {
-      // Place the whole bar after every earlier-ranked bar that overlaps it.
-      for (let i = 0; i < index; i++) {
-        const earlier = group[i];
-        if (earlier.start < segment.end && segment.start < earlier.end) {
-          segment.lane = Math.max(segment.lane, earlier.lane + 1);
-        }
-      }
-      lanes = Math.max(lanes, segment.lane + 1);
+    const lanes: Segment[][] = [];
+    // Start-time order lets each bar reuse a lane as soon as its last bar ends.
+    for (const segment of group) {
+      const lane = lanes.find((bars) => bars[bars.length - 1].end <= segment.start);
+      if (lane) lane.push(segment);
+      else lanes.push([segment]);
     }
-    for (const segment of group) segment.lanes = lanes;
+    const rank = (a: Segment, b: Segment) =>
+      a.task.order - b.task.order || a.task.id.localeCompare(b.task.id);
+    // Keep task ordering as a lane preference without adding unnecessary lanes.
+    const firstRanked = lanes.map((bars) => [...bars].sort(rank)[0]);
+    const orderedLanes = lanes.map((bars, index) => ({ bars, first: firstRanked[index] }));
+    orderedLanes.sort((a, b) => rank(a.first, b.first));
+    for (const [lane, { bars }] of orderedLanes.entries())
+      for (const segment of bars) {
+        segment.lane = lane;
+        segment.lanes = lanes.length;
+      }
     group = [];
   };
   for (const segment of result) {
