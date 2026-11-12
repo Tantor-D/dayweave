@@ -288,6 +288,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   font-size: 12px;
   padding-bottom: 11px;
 }
@@ -297,7 +298,10 @@
 }
 .sidebarTabs button {
   font-size: 11px;
-  padding: 3px 0;
+  padding: 8px 12px;
+  min-height: 36px;
+  flex-shrink: 0;
+  white-space: nowrap;
   border: 0;
   color: var(--muted);
 }
@@ -331,22 +335,6 @@
   border-radius: var(--radius);
   cursor: grab;
   touch-action: none;
-}
-.taskRow.rootTask {
-  position: relative;
-}
-.taskRow.rootTask:not(:first-child) {
-  margin-top: 16px;
-}
-.taskRow.rootTask:not(:first-child)::before {
-  content: '';
-  position: absolute;
-  top: -9px;
-  left: 10px;
-  right: 10px;
-  height: 1px;
-  background: var(--line);
-  pointer-events: none;
 }
 .rootTask .taskText > span {
   font-weight: 600;
@@ -1754,6 +1742,7 @@
 .sidebarTabs select {
   min-width: 0;
   width: 55%;
+  flex: 0 1 55%;
   font-size: 11px;
 }
 
@@ -2124,9 +2113,32 @@
 .taskRow {
   border: 0;
   border-radius: var(--radius);
-  margin-bottom: 4px;
+  margin-bottom: 0;
+  background: transparent;
+}
+.taskBranch {
+  border-radius: min(var(--radius), 12px);
   background: var(--card);
   box-shadow: var(--neu-soft);
+  min-width: 0;
+}
+.taskList > .taskBranch {
+  margin-bottom: 12px;
+  box-shadow: var(--neu-root-task);
+}
+.taskChildren {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 8px 10px 14px;
+}
+.taskChildren .taskChildren > .taskBranch {
+  box-shadow: var(--shadow);
+}
+/* Keep deeply nested tasks readable in the narrow sidebar. */
+.taskBranch[data-task-depth='8'] .taskChildren {
+  padding-left: 0;
+  padding-right: 0;
 }
 .taskRow.selectedTask {
   background: var(--accent-soft);

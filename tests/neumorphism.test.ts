@@ -19,6 +19,7 @@ test('neumorphism validates complete settings and rejects unsafe ranges', () => 
     { intensity: 0.3 },
     { blur: 37 },
     { light: 'left' },
+    { rootRelief: 'flat' },
     { unexpected: true },
   ]) {
     assert.equal(neumorphismSchema.safeParse({ ...defaultNeumorphism, ...patch }).success, false);
@@ -37,6 +38,15 @@ test('light direction reverses relief, while accent foreground remains readable'
     neumorphismTokens({ ...defaultNeumorphism, accent: '#000000' })['--on-accent'],
     '#ffffff',
   );
+});
+test('root relief defaults to inset for old settings and can rise below its children', () => {
+  const { rootRelief, ...legacy } = defaultNeumorphism;
+  assert.equal(neumorphismSchema.parse(legacy).rootRelief, rootRelief);
+  const raised = neumorphismSchema.parse({ ...legacy, rootRelief: 'raised' });
+  assert.match(neumorphismTokens()['--neu-root-task'], /inset/);
+  const tokens = neumorphismTokens(raised);
+  assert.doesNotMatch(tokens['--neu-root-task'], /inset/);
+  assert.ok(parseFloat(tokens['--neu-root-task']) < parseFloat(tokens['--neu-soft']));
 });
 test('old preferences acquire defaults and settings survive restarts and unrelated patches', async () => {
   const root = await mkdtemp(join(tmpdir(), 'neumorphism-'));
@@ -62,6 +72,7 @@ test('old preferences acquire defaults and settings survive restarts and unrelat
       background: '#ebe5dc',
       radius: 28,
       light: 'bottom-right' as const,
+      rootRelief: 'raised' as const,
     };
     await store.updatePreferences({ theme: 'neumorphism-light', neumorphism: custom });
     await store.close();

@@ -7,7 +7,7 @@ import { StatisticsDashboard } from '../../StatisticsDashboard';
 import statisticsStyles from './Statistics.module.css';
 import { TagPropagationDialog } from '../../TagPropagationDialog';
 import { InheritTagsContext } from '../../TaskFields';
-import { ancestors, taskPath, treeOrder } from '../../../domain/tree';
+import { taskPath, treeOrder } from '../../../domain/tree';
 import {
   ArrowLeft,
   ArrowRight,
@@ -112,7 +112,6 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
     <div
       key={task.id}
       data-task-drop={task.id}
-      style={{ marginLeft: Math.min(ancestors(task, workspace?.tasks ?? []).length, 8) * 14 }}
       title={[
         taskPath(task, workspace?.tasks ?? []),
         workspace?.tags
@@ -159,6 +158,25 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
         </div>
         <span className={s.taskGrip}>⠿</span>
       </ThemeCard>
+    </div>
+  );
+  // Keep the filtered tree order, but give each parent a surface around its descendants.
+  const sidebarIds = new Set(sidebarTasks.map((task) => task.id));
+  const children = new Map<string | null, Task[]>();
+  for (const task of treeOrder(sidebarTasks)) {
+    const parent = task.parentId && sidebarIds.has(task.parentId) ? task.parentId : null;
+    const siblings = children.get(parent) ?? [];
+    siblings.push(task);
+    children.set(parent, siblings);
+  }
+  const taskBranch = (task: Task, depth: number): React.ReactNode => (
+    <div key={task.id} className={s.taskBranch} data-task-depth={depth}>
+      {taskRow(task)}
+      {children.has(task.id) && (
+        <div className={s.taskChildren}>
+          {children.get(task.id)!.map((child) => taskBranch(child, depth + 1))}
+        </div>
+      )}
     </div>
   );
   return (
@@ -410,7 +428,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                           )}
                         </div>
                       ) : (
-                        <>{treeOrder(sidebarTasks).map(taskRow)}</>
+                        <>{children.get(null)?.map((task) => taskBranch(task, 0))}</>
                       )}
                     </div>
                     <div className={s.sidebarFoot}>

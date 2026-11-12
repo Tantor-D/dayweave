@@ -10,7 +10,7 @@ function normalizePreferences(value: Preferences): Preferences {
     ...value,
     liquidGlass: value.liquidGlass ?? { ...defaultLiquidGlass },
     showUntimed: value.showUntimed ?? false,
-    neumorphism: value.neumorphism ?? { ...defaultNeumorphism },
+    neumorphism: { ...defaultNeumorphism, ...value.neumorphism },
     autoCompleteParents: value.autoCompleteParents ?? true,
     statistics: value.statistics ?? structuredClone(defaultStatistics),
   };

@@ -137,6 +137,7 @@ export const neumorphismSchema = z.strictObject({
   intensity: z.number().min(0.05).max(0.25),
   blur: z.number().int().min(6).max(36),
   light: z.enum(['top-left', 'top-right', 'bottom-left', 'bottom-right']),
+  rootRelief: z.enum(['inset', 'raised']).default('inset'),
 });
 export const liquidGlassSchema = z.strictObject({
   backgroundImage: z

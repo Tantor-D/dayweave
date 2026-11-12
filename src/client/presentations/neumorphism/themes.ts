@@ -56,6 +56,7 @@ export function neumorphismTokens(
     '--shadow': shadow(1),
     '--neu-soft': shadow(0.4),
     '--neu-inset': shadow(0.45, 'inset '),
+    '--neu-root-task': settings.rootRelief === 'raised' ? shadow(0.2) : shadow(0.45, 'inset '),
   };
 }
 export const definitions = {

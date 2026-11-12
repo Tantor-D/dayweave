@@ -146,6 +146,18 @@ export function NeumorphismDrawer({
               </fieldset>
               <fieldset disabled={saving}>
                 <legend>光影</legend>
+                <label className={s.light}>
+                  一级任务材质
+                  <select
+                    value={draft.rootRelief}
+                    onChange={(e) =>
+                      update({ rootRelief: e.target.value as NeumorphismSettings['rootRelief'] })
+                    }
+                  >
+                    <option value="inset">凹陷</option>
+                    <option value="raised">凸起</option>
+                  </select>
+                </label>
                 <Range
                   label="凸起距离"
                   value={draft.distance}

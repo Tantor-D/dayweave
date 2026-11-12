@@ -6,6 +6,7 @@ export interface NeumorphismSettings {
   intensity: number;
   blur: number;
   light: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  rootRelief: 'inset' | 'raised';
 }
 export const defaultNeumorphism: NeumorphismSettings = {
   background: '#f3f3f8',
@@ -15,6 +16,7 @@ export const defaultNeumorphism: NeumorphismSettings = {
   intensity: 0.22,
   blur: 11,
   light: 'top-left',
+  rootRelief: 'inset',
 };
 export function isLightSurface(color: string): boolean {
   return (
