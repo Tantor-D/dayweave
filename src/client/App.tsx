@@ -30,7 +30,6 @@ const presentations = {
   },
 };
 const familyByTheme: Record<ThemeDefinition['id'], keyof typeof presentations> = {
-  'jianxu-light': 'glass',
   'glass-light': 'glass',
   'liquid-glass-light': 'glass',
   'glass-dark': 'glass',

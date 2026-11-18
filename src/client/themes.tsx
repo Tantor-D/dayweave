@@ -1,4 +1,3 @@
-import { jianxuTheme } from './presentations/jianxu/theme';
 import { definitions as liquidGlass } from './presentations/liquid-glass/themes';
 import { definitions as neumorphism } from './presentations/neumorphism/themes';
 import { definitions as claymorphism } from './presentations/claymorphism/themes';
@@ -18,7 +17,6 @@ export interface CardAppearanceProps {
 }
 export interface ThemeDefinition {
   id:
-    | 'jianxu-light'
     | 'glass-light'
     | 'glass-dark'
     | 'tide-dark'
@@ -46,7 +44,6 @@ export function ThemeCard(props: CardAppearanceProps) {
 }
 export const themes: Record<ThemeDefinition['id'], ThemeDefinition> = {
   ...glass,
-  [jianxuTheme.id]: jianxuTheme,
   ...liquidGlass,
   ...neobrutalism,
   ...claymorphism,
