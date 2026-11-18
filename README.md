@@ -158,3 +158,5 @@ v0.9.0 / neumorphism-theme：[功能计划](docs/plans/v0.9.0_neumorphism-theme_
 v0.10.0 / liquid-glass-theme：[功能计划](docs/plans/v0.10.0_liquid-glass-theme_functional-plan.md) · [技术方案](docs/plans/v0.10.0_liquid-glass-theme_technical-plan.md)。在「界面风格」中选择「液态玻璃 Liquid Glass」，即可启用浅色透光面板、边缘高光与胶囊控件；选择会保存并在刷新后恢复。保留现有默认主题。
 
 液态玻璃主题的「自定义」支持上传 JPG、PNG、WebP 背景图（最大 12MB，自动缩放压缩）及调节 0–40px 背景图片模糊。即时预览，保存后随本机偏好保留，取消恢复原外观；可移除图片回到白底，不影响其他主题。
+
+「自定义 → 面板材质」可选择柔白玻璃或清透玻璃。清透保留背景颜色与纹理，背景图片模糊仍单独控制；切换先预览，保存后保留，旧配置默认柔白。

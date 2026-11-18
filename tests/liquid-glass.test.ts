@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { defaultLiquidGlass, maxBackgroundLength } from '../src/domain/liquid-glass';
+import { backgroundOf, defaultLiquidGlass, maxBackgroundLength } from '../src/domain/liquid-glass';
 import { liquidGlassSchema } from '../src/domain/schema';
 import { Store } from '../src/server/store';
 import { prepareBackground } from '../src/client/presentations/liquid-glass/background';
@@ -23,9 +23,22 @@ test('liquid glass accepts bounded local JPEG data and rejects external or activ
     { backgroundBlur: -1 },
     { backgroundBlur: 41 },
     { backgroundBlur: 1.5 },
+    { material: 'unknown' },
+    { background: 'unknown' },
     { unexpected: true },
   ])
     assert.equal(liquidGlassSchema.safeParse({ ...defaultLiquidGlass, ...patch }).success, false);
+});
+
+test('background selection preserves legacy images and supports the bundled loop and white', () => {
+  const legacy = { ...defaultLiquidGlass, backgroundImage: image };
+  assert.equal(backgroundOf(defaultLiquidGlass), 'white');
+  assert.equal(backgroundOf(legacy), 'image');
+  for (const background of ['white', 'mist', 'image'] as const) {
+    const settings = liquidGlassSchema.parse({ ...legacy, background });
+    assert.equal(backgroundOf(settings), background);
+    assert.equal(settings.backgroundImage, image);
+  }
 });
 
 test('upload rejects unsupported and oversized files before attempting to decode them', async () => {
@@ -52,7 +65,12 @@ test('wallpaper survives restart and unrelated patches; old preferences default 
     delete old.liquidGlass;
     await writeFile(join(options.dataDir, 'preferences.json'), JSON.stringify(old));
     assert.deepEqual((await store.getPreferences()).liquidGlass, defaultLiquidGlass);
-    const custom = { backgroundImage: image, backgroundBlur: 18 };
+    const custom = { material: 'clear' as const, backgroundImage: image, backgroundBlur: 18 };
+    await writeFile(
+      join(options.dataDir, 'preferences.json'),
+      JSON.stringify({ ...old, liquidGlass: { backgroundImage: image, backgroundBlur: 18 } }),
+    );
+    assert.deepEqual((await store.getPreferences()).liquidGlass, { ...custom, material: 'soft' });
     await store.updatePreferences({ liquidGlass: custom });
     await store.close();
     store = await Store.open(options);

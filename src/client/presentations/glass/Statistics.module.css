@@ -803,8 +803,8 @@ main.hiddenWorkbench {
   border: 1px solid var(--glass-edge);
   background: var(--liquid-material);
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(var(--material-blur)) saturate(100%);
-  backdrop-filter: blur(var(--material-blur)) saturate(100%);
+  -webkit-backdrop-filter: blur(var(--material-blur)) var(--liquid-optics, saturate(100%));
+  backdrop-filter: blur(var(--material-blur)) var(--liquid-optics, saturate(100%));
 }
 :global([data-theme='liquid-glass-light']) .dialog {
   background: var(--solid);
@@ -825,4 +825,7 @@ main.hiddenWorkbench {
   background: #ffffffc4;
   border-radius: 22px;
   padding: 8px 12px;
+}
+:global([data-theme='liquid-glass-light'][data-material='clear']) .toolbar {
+  background: var(--liquid-material);
 }

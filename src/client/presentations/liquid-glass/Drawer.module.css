@@ -55,7 +55,7 @@
   position: relative;
   height: 190px;
   border-radius: 20px;
-  background: #eeeef0;
+  background: white;
   overflow: hidden;
   margin-bottom: 20px;
   display: grid;
@@ -74,8 +74,10 @@
   gap: 8px;
   padding: 20px 30px;
   border-radius: 24px;
-  background: #ffffff45;
-  border: 1px solid #ffffffaa;
+  background: var(--liquid-material);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(var(--material-blur)) var(--liquid-optics, saturate(100%)) var(--glass-lens,);
+  backdrop-filter: blur(var(--material-blur)) var(--liquid-optics, saturate(100%)) var(--glass-lens,);
   box-shadow: var(--shadow);
   font-size: 20px;
   font-weight: 600;
@@ -154,4 +156,23 @@
     max-height: 100dvh;
     border-radius: 0;
   }
+}
+.materials {
+  border: 0;
+  padding: 0;
+  margin: 0 0 24px;
+  min-width: 0;
+}
+.materials legend {
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.materials > div {
+  display: flex;
+  gap: 8px;
+}
+:global([data-theme='liquid-glass-light']) .drawer .materials button[aria-pressed='true'] {
+  background: #e8f1ff;
+  color: #005bc1;
+  border-color: #85b5f0;
 }

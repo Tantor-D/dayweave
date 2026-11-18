@@ -2007,19 +2007,24 @@
   flex-shrink: 0;
 }
 
+/* A lens belongs to one surface; nested dialogs must sample their own backdrop. */
+@property --glass-lens {
+  syntax: '*';
+  inherits: false;
+}
+
 /* Liquid Glass shares the glass layout; all material overrides stay theme-scoped. */
 .app[data-theme='liquid-glass-light'] {
   background:
-    radial-gradient(ellipse at 35% 0%, #fff 0%, transparent 62%),
-    linear-gradient(120deg, #f0f0f2, #fafafa 55%, #eeeef0);
+    #fff;
 }
 .app[data-theme='liquid-glass-light']
   :is(.sidebar, .board, .detail, .headerActions, .modal, .scheduleDialog, .toast) {
   background: var(--liquid-material);
   border: 1px solid var(--glass-edge);
   box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(var(--material-blur)) saturate(100%);
-  backdrop-filter: blur(var(--material-blur)) saturate(100%);
+  -webkit-backdrop-filter: blur(var(--material-blur)) var(--liquid-optics, saturate(100%)) var(--glass-lens,);
+  backdrop-filter: blur(var(--material-blur)) var(--liquid-optics, saturate(100%)) var(--glass-lens,);
 }
 /* A narrow reflective rim supplies the optical edge without frosting the content. */
 .app[data-theme='liquid-glass-light'] :is(.sidebar, .board, .headerActions) {
@@ -2186,6 +2191,18 @@
   background-position: center;
   pointer-events: none;
 }
+.mistWallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: center / cover no-repeat;
+}
+.mistWallpaper video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 /* Keep wallpaper legible through the glass while protecting the reading surfaces. */
 .app[data-theme='liquid-glass-light'][data-wallpaper='true'] {
   --surface: rgba(255, 255, 255, 0.54) !important;
@@ -2220,6 +2237,46 @@
   .app[data-theme='liquid-glass-light'][data-wallpaper='true'] .headerActions {
     background: var(--solid);
   }
+}
+
+/* Clear material carries the wallpaper through the panel, without a milky fill. */
+.app[data-theme='liquid-glass-light'][data-material='clear'] {
+  --surface: rgba(255, 255, 255, 0.06) !important;
+  --liquid-optics: saturate(135%) brightness(1.035);
+  --liquid-material:
+    linear-gradient(155deg, #ffffff24, #ffffff04 24%, #ffffff02 78%, #ffffff16),
+    rgba(255, 255, 255, 0.80) !important;
+  --glass-edge: rgba(255, 255, 255, 0.55) !important;
+  --shadow:
+    0 12px 24px -18px #17192455, inset 1px 1px 1px #fffffff2, inset -1px -1px 1px #ffffffbf,
+    inset 2px 3px 4px -3px #ffffffd9, inset -2px -3px 4px -2px #26283340 !important;
+  --muted: #34343a !important;
+}
+.app[data-theme='liquid-glass-light'][data-material='clear']
+  :is(.headerActions, .brand, .topCenter, .segmented, .dateNavigation) {
+  background: var(--liquid-material);
+}
+.app[data-theme='liquid-glass-light'][data-material='clear'] :is(.dayHeaders, .allDayRow) {
+  background: #fffffff0;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .app[data-theme='liquid-glass-light'][data-material='clear'] {
+    --liquid-material: var(--solid) !important;
+    --surface: var(--solid) !important;
+  }
+  .app[data-theme='liquid-glass-light'][data-material='clear'] :is(.dayHeaders, .allDayRow) {
+    background: var(--solid);
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .app[data-theme='liquid-glass-light'][data-material='clear'] {
+    --liquid-material: var(--solid) !important;
+  }
+}
+
+/* Keep navigation ink on a stable surface even above a very dark photograph. */
+.app[data-theme='liquid-glass-light'][data-wallpaper='true'] .headerActions {
+  background-color: #ffffffe0;
 }
 
 .app[data-theme='tide-dark'] {

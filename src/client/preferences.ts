@@ -8,7 +8,7 @@ import type { Preferences } from '../domain/types.ts';
 function normalizePreferences(value: Preferences): Preferences {
   return {
     ...value,
-    liquidGlass: value.liquidGlass ?? { ...defaultLiquidGlass },
+    liquidGlass: { ...defaultLiquidGlass, ...value.liquidGlass },
     showUntimed: value.showUntimed ?? false,
     neumorphism: { ...defaultNeumorphism, ...value.neumorphism },
     autoCompleteParents: value.autoCompleteParents ?? true,

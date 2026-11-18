@@ -140,6 +140,8 @@ export const neumorphismSchema = z.strictObject({
   rootRelief: z.enum(['inset', 'raised']).default('inset'),
 });
 export const liquidGlassSchema = z.strictObject({
+  background: z.enum(['white', 'mist', 'image']).optional(),
+  material: z.enum(['soft', 'clear']).default('soft'),
   backgroundImage: z
     .string()
     .refine(isBackgroundImage, '背景须为有效大小的本地 JPEG 图片')

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { defaultLiquidGlass, type LiquidGlassSettings } from '../../../domain/liquid-glass';
+import { MistWallpaper } from '../liquid-glass/MistWallpaper';
+import { backgroundOf, defaultLiquidGlass, type LiquidGlassSettings } from '../../../domain/liquid-glass';
 import { attachGlassRim } from '../liquid-glass/rim';
 import { LiquidGlassDrawer } from '../liquid-glass/LiquidGlassDrawer';
 import { TodoList } from '../../TodoList';
@@ -111,7 +112,12 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
   const [liquidDraft, setLiquidDraft] = useState<LiquidGlassSettings | null>(null);
   const liquid = preferences.theme === 'liquid-glass-light';
   const liquidSettings = liquidDraft ?? preferences.liquidGlass ?? defaultLiquidGlass;
-  const rimRef = preferences.theme === 'tide-dark' ? attachGlassRim : undefined;
+  const background = backgroundOf(liquidSettings);
+  const showImage = liquid && background === 'image' && !!liquidSettings.backgroundImage;
+  const showMist = liquid && background === 'mist';
+  const rimRef = preferences.theme === 'tide-dark' || (showImage && liquidSettings.material === 'clear')
+    ? attachGlassRim
+    : undefined;
   const { panelWidth, resize } = usePanelResize(preferences.panelWidth, updatePreferences);
   const taskRow = (task: Task) => (
     <div
@@ -173,9 +179,11 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
           className={s.app}
           style={themeStyle(preferences.theme)}
           data-theme={preferences.theme}
-          data-wallpaper={liquid && !!liquidSettings.backgroundImage ? 'true' : undefined}
+          data-material={liquid ? (liquidSettings.material ?? 'soft') : undefined}
+          data-wallpaper={showMist || showImage ? 'true' : undefined}
         >
-          {liquid && liquidSettings.backgroundImage && (
+          {showMist && <MistWallpaper />}
+          {showImage && (
             <div
               className={s.wallpaper}
               aria-hidden="true"

@@ -1,13 +1,20 @@
 export interface LiquidGlassSettings {
+  background?: 'white' | 'mist' | 'image';
+  material?: 'soft' | 'clear';
   backgroundImage: string | null;
   backgroundBlur: number;
 }
 
 export const maxBackgroundLength = 1_400_000;
 export const defaultLiquidGlass: LiquidGlassSettings = {
+  material: 'soft',
   backgroundImage: null,
   backgroundBlur: 0,
 };
+
+export function backgroundOf(settings: LiquidGlassSettings) {
+  return settings.background ?? (settings.backgroundImage ? 'image' : 'white');
+}
 
 export function isBackgroundImage(value: string): boolean {
   const prefix = 'data:image/jpeg;base64,';

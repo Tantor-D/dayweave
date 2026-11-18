@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, SlidersHorizontal, X } from 'lucide-react';
-import { defaultLiquidGlass, type LiquidGlassSettings } from '../../../domain/liquid-glass';
+import { mistPoster } from './MistWallpaper';
+import { backgroundOf, defaultLiquidGlass, type LiquidGlassSettings } from '../../../domain/liquid-glass';
 import type { Workbench } from '../../application/useWorkbench';
 import { prepareBackground } from './background';
+import { attachGlassRim } from './rim';
 import s from './Drawer.module.css';
 
 export function LiquidGlassDrawer({
@@ -53,7 +55,7 @@ export function LiquidGlassDrawer({
         title="自定义背景图片和模糊程度"
         onClick={() => {
           setError('');
-          onDraft({ ...(w.preferences.liquidGlass ?? defaultLiquidGlass) });
+          onDraft({ ...defaultLiquidGlass, ...w.preferences.liquidGlass });
         }}
       >
         <SlidersHorizontal size={16} />
@@ -80,19 +82,50 @@ export function LiquidGlassDrawer({
         {draft && (
           <>
             <div className={s.body}>
-              <p className={s.hint}>让喜欢的图片透过玻璃。调整即时预览，保存后保留。</p>
+              <p className={s.hint}>背景和材质会即时预览，保存后保留。</p>
+              <fieldset className={s.materials} disabled={pending}>
+                <legend>背景</legend>
+                <div>
+                  {([['white', '白底'], ['mist', '流动薄雾'], ['image', '我的图片']] as const).map(([background, label]) => (
+                    <button key={background} aria-pressed={backgroundOf(draft) === background}
+                      disabled={background === 'image' && !draft.backgroundImage}
+                      onClick={() => onDraft({ ...draft, background })}>{label}</button>
+                  ))}
+                </div>
+              </fieldset>
               <div className={s.preview} aria-label="背景预览">
-                {draft.backgroundImage && (
+                {backgroundOf(draft) === 'mist' && <img src={mistPoster} alt="流动薄雾封面" />}
+                {backgroundOf(draft) === 'image' && draft.backgroundImage && (
                   <img
                     src={draft.backgroundImage}
                     alt="当前背景"
                     style={{ filter: `blur(${draft.backgroundBlur}px)` }}
                   />
                 )}
-                <span className={s.sample}>
+                <span ref={draft.material === 'clear' ? attachGlassRim : undefined} className={s.sample}>
                   留白 <small>清透，自在</small>
                 </span>
               </div>
+              <fieldset className={s.materials} disabled={pending}>
+                <legend>面板材质</legend>
+                <div>
+                  <button
+                    aria-pressed={(draft.material ?? 'soft') === 'soft'}
+                    onClick={() => onDraft({ ...draft, material: 'soft' })}
+                  >
+                    柔白玻璃
+                  </button>
+                  <button
+                    aria-pressed={draft.material === 'clear'}
+                    onClick={() => onDraft({ ...draft, material: 'clear' })}
+                  >
+                    清透玻璃
+                  </button>
+                </div>
+                <p className={s.hint}>
+                  清透材质保留背景颜色与纹理，仅在边缘形成高光。背景模糊仍由下方滑块单独控制。
+                </p>
+              </fieldset>
               <label className={s.upload}>
                 <span>
                   <ImagePlus size={18} />
@@ -111,7 +144,7 @@ export function LiquidGlassDrawer({
                     setError('');
                     try {
                       const backgroundImage = await prepareBackground(file);
-                      onDraft({ ...draft, backgroundImage });
+                      onDraft({ ...draft, background: 'image', backgroundImage });
                     } catch (error) {
                       setError(error instanceof Error ? error.message : '图片处理失败，请重试。');
                     } finally {
@@ -126,7 +159,7 @@ export function LiquidGlassDrawer({
               <button
                 disabled={pending || !draft.backgroundImage}
                 onClick={() => {
-                  onDraft({ ...draft, backgroundImage: null });
+                  onDraft({ ...draft, background: backgroundOf(draft) === 'image' ? 'white' : backgroundOf(draft), backgroundImage: null });
                   setError('');
                 }}
               >
@@ -142,7 +175,7 @@ export function LiquidGlassDrawer({
                   min={0}
                   max={40}
                   step={1}
-                  disabled={pending || !draft.backgroundImage}
+                  disabled={pending || backgroundOf(draft) !== 'image'}
                   value={draft.backgroundBlur}
                   onChange={(e) => onDraft({ ...draft, backgroundBlur: Number(e.target.value) })}
                 />
