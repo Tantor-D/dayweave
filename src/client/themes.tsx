@@ -21,6 +21,7 @@ export interface ThemeDefinition {
     | 'jianxu-light'
     | 'glass-light'
     | 'glass-dark'
+    | 'tide-dark'
     | 'neobrutalism-light'
     | 'claymorphism-light'
     | 'neumorphism-light'

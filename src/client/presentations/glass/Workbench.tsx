@@ -1,6 +1,7 @@
 import { JournalOverview } from '../jianxu/JournalOverview';
 import { useState } from 'react';
 import { defaultLiquidGlass, type LiquidGlassSettings } from '../../../domain/liquid-glass';
+import { attachGlassRim } from '../liquid-glass/rim';
 import { LiquidGlassDrawer } from '../liquid-glass/LiquidGlassDrawer';
 import { TodoList } from '../../TodoList';
 import { usePanelResize } from './usePanelResize';
@@ -111,6 +112,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
   const [liquidDraft, setLiquidDraft] = useState<LiquidGlassSettings | null>(null);
   const liquid = preferences.theme === 'liquid-glass-light';
   const liquidSettings = liquidDraft ?? preferences.liquidGlass ?? defaultLiquidGlass;
+  const rimRef = preferences.theme === 'tide-dark' ? attachGlassRim : undefined;
   const journal = preferences.theme === 'jianxu-light';
   const [planning, setPlanning] = useState(false);
   const { panelWidth, resize } = usePanelResize(preferences.panelWidth, updatePreferences);
@@ -203,7 +205,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               <span className={s.liveDot} />
               {busy ? '正在保存…' : connected ? '一切就绪，专注当下' : '连接中断，正在重连'}
             </div>
-            <nav className={s.headerActions}>
+            <nav ref={rimRef} className={s.headerActions}>
               <button
                 disabled={workbench.todoEditing}
                 aria-pressed={view === 'workbench'}
@@ -322,7 +324,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                 overview={journal && !planning && view === 'workbench' ? <JournalOverview workbench={workbench} /> : undefined}
                 panelWidth={panelWidth}
                 sidebar={
-                  <aside className={s.sidebar}>
+                  <aside ref={rimRef} className={s.sidebar}>
                     <div className={s.sidebarHeading}>
                       <div>
                         <h1>
@@ -471,7 +473,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                   />
                 }
                 board={
-                  <section className={s.board}>
+                  <section ref={rimRef} className={s.board}>
                     <div className={s.boardToolbar}>
                       <div className={s.dateTitle}>
                         <h2>
@@ -581,7 +583,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                 }
                 detail={
                   panel && (
-                    <aside className={s.detail}>
+                    <aside ref={rimRef} className={s.detail}>
                       <div className={s.detailHeader}>
                         <span>{panelTitles[panel]}</span>
                         <button aria-label="收起详情面板" onClick={() => setPanel(undefined)}>

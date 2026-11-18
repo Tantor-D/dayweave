@@ -145,13 +145,13 @@
 .personal strong {
   color: #508c79;
 }
-:global([data-theme='glass-dark']) .overtime strong {
+:global(:is([data-theme='glass-dark'], [data-theme='tide-dark'])) .overtime strong {
   color: #ecac8f;
 }
-:global([data-theme='glass-dark']) .lunch strong {
+:global(:is([data-theme='glass-dark'], [data-theme='tide-dark'])) .lunch strong {
   color: #dbc380;
 }
-:global([data-theme='glass-dark']) .personal strong {
+:global(:is([data-theme='glass-dark'], [data-theme='tide-dark'])) .personal strong {
   color: #8bc7b1;
 }
 .method {

@@ -130,6 +130,7 @@ export interface Preferences {
     | 'jianxu-light'
     | 'glass-light'
     | 'glass-dark'
+    | 'tide-dark'
     | 'neobrutalism-light'
     | 'claymorphism-light'
     | 'neumorphism-light'

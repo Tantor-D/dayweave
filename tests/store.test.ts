@@ -321,6 +321,7 @@ test('all presentation choices persist without changing workspace or other prefe
     'jianxu-light',
     'glass-light',
     'glass-dark',
+    'tide-dark',
     'claymorphism-light',
     'neumorphism-light',
     'liquid-glass-light',

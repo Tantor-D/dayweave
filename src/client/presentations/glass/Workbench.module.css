@@ -2221,3 +2221,22 @@
     background: var(--solid);
   }
 }
+
+.app[data-theme='tide-dark'] {
+  color-scheme: dark;
+  background: #091424 url('/backgrounds/tide.webp') center / cover no-repeat;
+}
+.app[data-theme='tide-dark'] :is(.sidebar, .board, .detail, .headerActions) {
+  background: linear-gradient(125deg, #46638058, #10263c85), var(--surface);
+  backdrop-filter: blur(2px) saturate(145%) var(--glass-lens,);
+}
+.app[data-theme='tide-dark'] .headerActions button.active {
+  background: #e6f4fc;
+  color: #193248;
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .app[data-theme='tide-dark'] :is(.sidebar, .board, .detail, .headerActions) {
+    background: var(--solid);
+    backdrop-filter: none;
+  }
+}

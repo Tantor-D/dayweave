@@ -34,6 +34,7 @@ const familyByTheme: Record<ThemeDefinition['id'], keyof typeof presentations> =
   'glass-light': 'glass',
   'liquid-glass-light': 'glass',
   'glass-dark': 'glass',
+  'tide-dark': 'glass',
   'neobrutalism-light': 'neobrutalism',
   'claymorphism-light': 'claymorphism',
   'neumorphism-light': 'neumorphism',

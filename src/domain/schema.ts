@@ -154,6 +154,7 @@ export const preferencesSchema = z.strictObject({
     'jianxu-light',
     'glass-light',
     'glass-dark',
+    'tide-dark',
     'neobrutalism-light',
     'claymorphism-light',
     'neumorphism-light',
