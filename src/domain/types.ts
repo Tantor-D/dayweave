@@ -127,6 +127,7 @@ export interface Preferences {
   neumorphism?: NeumorphismSettings;
   statistics: StatisticsPreferences;
   theme:
+    | 'jianxu-light'
     | 'glass-light'
     | 'glass-dark'
     | 'neobrutalism-light'

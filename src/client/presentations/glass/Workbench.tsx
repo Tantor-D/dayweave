@@ -1,3 +1,4 @@
+import { JournalOverview } from '../jianxu/JournalOverview';
 import { useState } from 'react';
 import { defaultLiquidGlass, type LiquidGlassSettings } from '../../../domain/liquid-glass';
 import { LiquidGlassDrawer } from '../liquid-glass/LiquidGlassDrawer';
@@ -110,6 +111,8 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
   const [liquidDraft, setLiquidDraft] = useState<LiquidGlassSettings | null>(null);
   const liquid = preferences.theme === 'liquid-glass-light';
   const liquidSettings = liquidDraft ?? preferences.liquidGlass ?? defaultLiquidGlass;
+  const journal = preferences.theme === 'jianxu-light';
+  const [planning, setPlanning] = useState(false);
   const { panelWidth, resize } = usePanelResize(preferences.panelWidth, updatePreferences);
   const taskRow = (task: Task) => (
     <div
@@ -192,7 +195,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
                 <span />
               </div>
               <div>
-                <strong>留白</strong>
+                <strong>{journal ? '间序' : '留白'}</strong>
                 <span>专注工作台</span>
               </div>
             </div>
@@ -263,6 +266,11 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               >
                 <History size={17} />
               </button>
+              {journal && view === 'workbench' && (
+                <button disabled={!!panel || !!drag} onClick={() => setPlanning(!planning)}>
+                  <CalendarDays size={16} />{planning ? '返回日视图' : '排期视图'}
+                </button>
+              )}
               <ThemePicker workbench={workbench} extraLocked={liquidDraft !== null} />
               {liquid && (
                 <LiquidGlassDrawer
@@ -311,6 +319,7 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
               )}
               <ViewLayout
                 className={`${s.layout} ${view !== 'workbench' ? statisticsStyles.hiddenWorkbench : ''}`}
+                overview={journal && !planning && view === 'workbench' ? <JournalOverview workbench={workbench} /> : undefined}
                 panelWidth={panelWidth}
                 sidebar={
                   <aside className={s.sidebar}>
@@ -671,6 +680,7 @@ function FileIcon() {
 }
 
 function ViewLayout({
+  overview,
   sidebar,
   board,
   detail,
@@ -678,6 +688,7 @@ function ViewLayout({
   panelWidth,
   className,
 }: {
+  overview?: React.ReactNode;
   sidebar: React.ReactNode;
   board: React.ReactNode;
   detail?: React.ReactNode;
@@ -690,9 +701,7 @@ function ViewLayout({
       className={className}
       style={{ '--panel-width': `${panelWidth}px` } as React.CSSProperties}
     >
-      {sidebar}
-      {divider}
-      {board}
+      {overview ?? <>{sidebar}{divider}{board}</>}
       {detail}
     </main>
   );

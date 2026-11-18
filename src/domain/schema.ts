@@ -151,6 +151,7 @@ export const preferencesSchema = z.strictObject({
   neumorphism: neumorphismSchema.optional(),
   liquidGlass: liquidGlassSchema.optional(),
   theme: z.enum([
+    'jianxu-light',
     'glass-light',
     'glass-dark',
     'neobrutalism-light',

@@ -1,7 +1,8 @@
+@scope (.journalOverview, [data-journal-prototype]) {
 * {
   box-sizing: border-box;
 }
-:root {
+:scope {
   font-family:
     Inter,
     -apple-system,
@@ -559,4 +560,5 @@ main {
   .ribbon {
     top: 38%;
   }
+}
 }

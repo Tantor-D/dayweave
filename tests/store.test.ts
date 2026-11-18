@@ -318,6 +318,7 @@ test('all presentation choices persist without changing workspace or other prefe
   await f.store.updatePreferences({ panelWidth: 330, days: 7 });
   for (const theme of [
     'neobrutalism-light',
+    'jianxu-light',
     'glass-light',
     'glass-dark',
     'claymorphism-light',
