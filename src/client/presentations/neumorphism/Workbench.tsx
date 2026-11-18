@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { NeumorphismSettings } from '../../../domain/neumorphism';
-import { neumorphismTokens } from './themes';
+import { backgroundPresets, neumorphismTokens } from './themes';
 import { NeumorphismDrawer } from './NeumorphismDrawer';
 import { TodoList } from '../../TodoList';
 import { StatisticsDashboard } from '../../StatisticsDashboard';
@@ -184,6 +184,12 @@ export function WorkbenchView({ workbench }: { workbench: Workbench }) {
       <InheritTagsContext.Provider value={preferences.inheritParentTags}>
         <div
           className={s.app}
+          data-moving-background={backgroundPresets.some(
+            (preset) =>
+              preset.animated &&
+              preset.color ===
+                (appearanceDraft ?? preferences.neumorphism)?.background.toLowerCase(),
+          )}
           style={{
             ...themeStyle(preferences.theme),
             ...neumorphismTokens(appearanceDraft ?? preferences.neumorphism),

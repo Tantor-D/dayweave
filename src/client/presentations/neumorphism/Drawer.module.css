@@ -179,3 +179,11 @@ button.trigger span {
   gap: 7px;
   padding: 8px 11px;
 }
+
+.swatch {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid rgb(40 52 68 / 18%);
+}

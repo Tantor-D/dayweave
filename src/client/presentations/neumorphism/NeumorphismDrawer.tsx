@@ -6,6 +6,7 @@ import {
   type NeumorphismSettings,
 } from '../../../domain/neumorphism';
 import type { Workbench } from '../../application/useWorkbench';
+import { backgroundPresets } from './themes';
 import s from './Drawer.module.css';
 
 export function NeumorphismDrawer({
@@ -87,13 +88,7 @@ export function NeumorphismDrawer({
               <fieldset disabled={saving}>
                 <legend>配色</legend>
                 <div className={s.presets}>
-                  {[
-                    ['浅灰', '#e0e0e0'],
-                    ['暖白', '#ebe5dc'],
-                    ['灰蓝', '#dce4ec'],
-                    ['晨光暖白', '#f3f3f8'],
-                    ['冷白', '#f3f5f8'],
-                  ].map(([name, color]) => (
+                  {backgroundPresets.map(({ name, color, gradient }) => (
                     <button
                       key={color}
                       aria-pressed={draft.background === color}
@@ -102,6 +97,11 @@ export function NeumorphismDrawer({
                         setError('');
                       }}
                     >
+                      <i
+                        aria-hidden="true"
+                        className={s.swatch}
+                        style={{ background: gradient ?? color }}
+                      />
                       {name}
                     </button>
                   ))}

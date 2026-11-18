@@ -2341,7 +2341,6 @@
   }
 }
 
-/* Morning white carries the glass palette's lavender, blush and pale blue light. */
 .app {
   background: var(--neu-canvas);
 }
@@ -2355,4 +2354,21 @@
 .viewToolbar,
 .detailHeader {
   background: var(--neu-heading);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app {
+    background-size: var(--neu-canvas-size);
+  }
+  .app[data-moving-background='true'] {
+    animation: canvasDrift var(--neu-drift-duration) ease-in-out infinite alternate;
+  }
+}
+@keyframes canvasDrift {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
 }
